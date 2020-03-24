@@ -1,25 +1,32 @@
+
+
 __author__ = "Claire Casalnova"
 
 import socket
 import sys
 import traceback
-from Aggregator import Aggregator
+import time
+from sss.Aggregator import Aggregator
 from numpy import long
 from threading import Thread
 
 # delimiter variable for sending data in chunks
 DELIMITER = "\n"
+num_smart_meters = 3
+num_aggs = 3
+AGG_CONNS = []
 
 
 def start_server(connections, eu_conn):
     # set up connection to the smart meters
+    global num_smart_meters
     TCP_IP = '127.0.0.1'
     TCP_PORT = int(sys.argv[1])
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     s.bind((TCP_IP, TCP_PORT))
 
     # sets up the number of smart meters that will be in the network and sends this data to utility company
-    num_smart_meters = 3
+
     num_smart_meters = str(num_smart_meters)
     num_smart_meters += DELIMITER
     eu_conn.sendall(num_smart_meters.encode("utf-8"))
@@ -40,6 +47,9 @@ def start_server(connections, eu_conn):
             print("Thread did not start.")
             traceback.print_exc()
 
+def connect_to_aggs():
+    #function to connect to the other aggs
+    pass
 
 def clientThread(connection, aggregator, ip, port, eu_conn, max_buffer_size=5120):
     """
@@ -111,9 +121,24 @@ def process_input(input_str):
     """
     return str(input_str).upper()
 
+def agg_server():
+    TCP_IP = '127.0.0.1'
+    TCP_PORT = int(sys.argv[1]) - 1000
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((TCP_IP, TCP_PORT))
+    while len(AGG_CONNS) < int(num_aggs):
+        connect_to_aggs()
+        print(len(AGG_CONNS))
+        s.listen()
+        conn, addr = s.accept()
+        print(conn)
+        print('Connected to :', addr[0], ':', addr[1])
+        AGG_CONNS.append(conn)
+
+
 
 def main():
-    # set up te socket connection the smart meters
+    # set up the socket connection the utility company
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     host = "127.0.0.1"
     port = 8000
@@ -124,6 +149,10 @@ def main():
         sys.exit()
 
     connections = []
+
+    #set up connection to other aggregators
+    agg_server()
+
 
     # start the set up and then close connections when finished
     start_server(connections, soc)

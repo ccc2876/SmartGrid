@@ -4,7 +4,7 @@ import socket
 import sys
 import random
 import time
-from SmartMeter import SmartMeter
+from sss.SmartMeter import SmartMeter
 
 
 def main():

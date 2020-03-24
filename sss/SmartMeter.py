@@ -1,3 +1,4 @@
+__author__ = "Claire Casalnova"
 import random
 
 

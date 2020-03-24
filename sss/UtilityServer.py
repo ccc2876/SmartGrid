@@ -3,7 +3,7 @@ __author__ = "Claire Casalnova"
 import socket
 import sys
 import traceback
-from ElectricalUtility import ElectricalUtility
+from sss.ElectricalUtility import ElectricalUtility
 from threading import Thread
 
 

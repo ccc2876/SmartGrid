@@ -1,5 +1,6 @@
 __author__ = "Claire Casalnova"
-
+# homomorphic high computation - computational overhead
+#
 import socket
 import sys
 import traceback
@@ -29,10 +30,6 @@ def agg_server():
     print(len(AGG_CONNS))
     s.listen()
     connect_to_aggs(s)
-        # conn, addr = s.accept()
-        # print(conn)
-        # print('Connected to :', addr[0], ':', addr[1])
-        # AGG_CONNS.append(conn)
 
 
 def connect_to_aggs(s):
@@ -50,8 +47,6 @@ def connect_to_aggs(s):
                 conn,addr = s.accept()
                 AGG_CONNS.append(conn)
                 print(conn)
-
-
             except:
                 print("Connection Error")
                 sys.exit()
@@ -150,7 +145,6 @@ def clientThread(connection, aggregator, ip, port, eu_conn, num_sm, max_buffer_s
                     print(c)
                     c.sendall(sending_string.encode("utf-8"))
                     print(c)
-                    time.sleep(5)
                     value=int(receive_input(c, max_buffer_size))
                     while not value:
                         value = int(receive_input(c, max_buffer_size))

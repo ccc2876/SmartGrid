@@ -135,6 +135,7 @@ def clientThread(connection, aggregator, ip, port, eu_conn, num_sm, max_buffer_s
                 aggregator.calc_sum(constant)
                 print(aggregator.sumofshares)
                 lock.release()
+
             else:
                 # Send final spatial info to the electrical utility company
                 shares = False

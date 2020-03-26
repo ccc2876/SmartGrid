@@ -1,5 +1,3 @@
-
-
 __author__ = "Claire Casalnova"
 
 import socket
@@ -8,18 +6,64 @@ import traceback
 import time
 from sss.Aggregator import Aggregator
 from numpy import long
-from threading import Thread
+from threading import Thread, Lock
 
 # delimiter variable for sending data in chunks
 DELIMITER = "\n"
-num_smart_meters = 3
-num_aggs = 3
-AGG_CONNS = []
+AGG_CONNS= []
+num_aggs= 2
+bill_cycle = 1
+end = 0
+start = 0
+num_smart_meters = 1
+lock =Lock()
+
+f = None
+
+def agg_server():
+    TCP_IP = '127.0.0.1'
+    TCP_PORT = int(sys.argv[1]) - 1000
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.bind((TCP_IP, TCP_PORT))
+
+    print(len(AGG_CONNS))
+    s.listen()
+    connect_to_aggs(s)
+        # conn, addr = s.accept()
+        # print(conn)
+        # print('Connected to :', addr[0], ':', addr[1])
+        # AGG_CONNS.append(conn)
+
+
+def connect_to_aggs(s):
+    #function to connect to the other aggs
+    connections = []
+    host= "127.0.0.1"
+    port = 7001
+    for i in range(0, num_aggs):
+        if not (port == int(sys.argv[1])-1000):
+            print(port)
+            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            connections.append(soc)
+            try:
+                soc.connect((host, port))
+                conn,addr = s.accept()
+                AGG_CONNS.append(conn)
+                print(conn)
+
+
+            except:
+                print("Connection Error")
+                sys.exit()
+        port +=1
+        time.sleep(9)
+    print(len(AGG_CONNS))
+
 
 
 def start_server(connections, eu_conn):
+    global num_smart_meters, f
     # set up connection to the smart meters
-    global num_smart_meters
     TCP_IP = '127.0.0.1'
     TCP_PORT = int(sys.argv[1])
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -30,28 +74,31 @@ def start_server(connections, eu_conn):
     num_smart_meters = str(num_smart_meters)
     num_smart_meters += DELIMITER
     eu_conn.sendall(num_smart_meters.encode("utf-8"))
+    #name = "agg" + sys.argv[2] + "_time.txt"
+    #f = open(name, "w")
     ID = int(sys.argv[2])
     print(sys.argv[1], " ", sys.argv[2])
     aggregator = Aggregator(ID, int(num_smart_meters))
 
-    while True:
-        # while len(connections) < int(num_smart_meters):
+    threads = []
+    # while True:
+    while len(connections) < int(num_smart_meters):
         s.listen()
         conn, addr = s.accept()
         print('Connected to :', addr[0], ':', addr[1])
         connections.append(conn)
         conn.sendall(str(aggregator.get_ID()).encode("utf-8"))
         try:
-            Thread(target=clientThread, args=(conn, aggregator, TCP_IP, TCP_PORT, eu_conn)).start()
+            t = Thread(target=clientThread, args=(conn, aggregator, TCP_IP, TCP_PORT, eu_conn, num_smart_meters))
+            threads.append(t)
+            t.start()
+
         except:
             print("Thread did not start.")
             traceback.print_exc()
 
-def connect_to_aggs():
-    #function to connect to the other aggs
-    pass
 
-def clientThread(connection, aggregator, ip, port, eu_conn, max_buffer_size=5120):
+def clientThread(connection, aggregator, ip, port, eu_conn, num_sm, max_buffer_size=5120):
     """
     runs a thread for each connection to a smart meter
     :param connection: the connection
@@ -61,40 +108,63 @@ def clientThread(connection, aggregator, ip, port, eu_conn, max_buffer_size=5120
     :param eu_conn: the connection the utility company
     :param max_buffer_size: the max size of the buffer set to 5120
     """
+    global bill_cycle, end, start
     sm_id = receive_input(connection, max_buffer_size)
     time_length = int(receive_input(connection, max_buffer_size))
     agg_num = int(receive_input(connection, max_buffer_size))
+    zp_space = int(receive_input(connection, max_buffer_size))
+
     aggregator.calculate_lagrange_multiplier(int(agg_num))
-    counter = 0
     is_active = True
     shares = True
+    start = time.time()
     while is_active:
         meter_id = int(sm_id)
         meter_id = str(meter_id) + DELIMITER
         meter_id = int(meter_id.strip(DELIMITER))
+        counter = 0
         is_active = False
         while shares:
             client_input = receive_input(connection, max_buffer_size)
             if client_input:
-                print("Processed result: {}".format(client_input))
-                aggregator.append_shares(int(client_input), meter_id)
-                aggregator.update_totals(int(meter_id))
-                constant = long(aggregator.get_current_total(meter_id)) * long(aggregator.get_lagrange_multiplier())
-                aggregator.calc_sum(constant, meter_id)
-                counter += 1
-                if counter > time_length:
-                    shares = False
+                print("Processed share: {}".format(client_input))
+                lock.acquire()
+                aggregator.update_billing_counters(int(client_input), meter_id)
+                aggregator.update_spatial_counter(int(client_input))
+                constant = long(aggregator.get_spatial_total()) * long(aggregator.get_lagrange_multiplier())
+                aggregator.calc_sum(constant)
+                print(aggregator.sumofshares)
+                lock.release()
             else:
-                connection.close()
-                print("Connection " + str(ip) + ":" + str(port) + " closed")
+                # Send final spatial info to the electrical utility company
+                shares = False
                 sending_string = str(agg_num) + DELIMITER
                 sending_string += str(meter_id) + DELIMITER
-                val = aggregator.get_sum(meter_id)
+                lock.acquire()
+                val = aggregator.calculate_delta()
                 val = str(val) + DELIMITER
                 sending_string += val
-                sending_string += "done\n"
-                eu_conn.sendall(sending_string.encode("utf-8"))
-                shares = False
+                lock.release()
+                for c in AGG_CONNS:
+                    print(c)
+                    c.sendall(sending_string.encode("utf-8"))
+                    print(c)
+                    time.sleep(5)
+                    value=int(receive_input(c, max_buffer_size))
+                    while not value:
+                        value = int(receive_input(c, max_buffer_size))
+                        print(value)
+                    lock.acquire()
+                    aggregator.set_vals_from_all_aggs(value)
+                    lock.release()
+                time.sleep(0.5)
+                lock.acquire()
+                aggregator.reset_spatial()
+                lock.release()
+                counter += 1
+    end = time.time()
+    aggregator.time = end-start
+    connection.close()
 
 
 def receive_input(connection, max_buffer_size):
@@ -121,21 +191,6 @@ def process_input(input_str):
     """
     return str(input_str).upper()
 
-def agg_server():
-    TCP_IP = '127.0.0.1'
-    TCP_PORT = int(sys.argv[1]) - 1000
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((TCP_IP, TCP_PORT))
-    while len(AGG_CONNS) < int(num_aggs):
-        connect_to_aggs()
-        print(len(AGG_CONNS))
-        s.listen()
-        conn, addr = s.accept()
-        print(conn)
-        print('Connected to :', addr[0], ':', addr[1])
-        AGG_CONNS.append(conn)
-
-
 
 def main():
     # set up the socket connection the utility company
@@ -152,13 +207,15 @@ def main():
 
     #set up connection to other aggregators
     agg_server()
-
+    print("connected to all aggs:")
 
     # start the set up and then close connections when finished
     start_server(connections, soc)
-    for conn in connections:
-        conn.close()
+    # for conn in connections:
+    #     conn.close()
 
 
 if __name__ == "__main__":
     main()
+ #   f.write(str(end - start) + "\n")
+  #  f.close()

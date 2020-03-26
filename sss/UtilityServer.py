@@ -4,22 +4,50 @@ import socket
 import sys
 import traceback
 from sss.ElectricalUtility import ElectricalUtility
-from threading import Thread
+from threading import Thread,Lock
+import time
 
 
 DELIMITER = "\n"
+print_lock = Lock()
+print_cycle = 1
+num_aggs = 2
+num_sm = 1
+threads =[]
+finished = False
 
 
 def main():
-    start_server()
+    global finished
+    eu = ElectricalUtility()
+    eu.set_num_sm(int(num_sm))
+    start_server(eu)
+    while not finished:
+        for x in threads:
+            if not x.is_alive():
+                finished = True
+            else:
+                finished = False
+    if finished:
+        billing(eu)
 
 
-def start_server():
+
+def billing(eu):
+    print_lock.acquire()
+    eu.get_total_amount()
+
+    bills = eu.get_bills()
+    for i in range(0, len(bills)):
+        print("Bill amount for SM #", i+1, ": ", bills[i])
+
+    print_lock.release()
+
+def start_server(eu):
     """
     set up the connection to each of the aggregators
     start a thread for each connection
     """
-    eu = ElectricalUtility()
     connections = []
     host = "127.0.0.1"
     port = 8000  # arbitrary non-privileged port
@@ -31,20 +59,24 @@ def start_server():
     except:
         print("Bind failed. Error : " + str(sys.exc_info()))
         sys.exit()
-    soc.listen(6)  # queue up to 6 requests
+    soc.listen()  # queue up to 6 requests
     print("Socket now listening")
 
-    while True:
+    while len(connections) < num_aggs:
         connection, address = soc.accept()
         connections.append(connection)
         eu.set_num_aggs(len(connections))
         ip, port = str(address[0]), str(address[1])
         print("Connected with " + ip + ":" + port)
         try:
-            Thread(target=clientThread, args=(connection,eu, ip, port)).start()
+            t = Thread(target=clientThread, args=(connection,eu, ip, port))
+            threads.append(t)
+            t.start()
+
         except:
             print("Thread did not start.")
             traceback.print_exc()
+
 
 
 def clientThread(connection, eu, ip, port, max_buffer_size=5120):
@@ -56,21 +88,39 @@ def clientThread(connection, eu, ip, port, max_buffer_size=5120):
     :param port: the port of the connection
     :param max_buffer_size: the max buffer size set to 5120
     """
+
+    global print_cycle
     sm_num = receive_input(connection, max_buffer_size)
     sm_num = int(sm_num[0])
-    eu.set_num_sm(int(sm_num))
     is_active = True
-
+    counter = 1
     while is_active:
         # receive the input from the aggregators and process it in the utility company object
         client_input = receive_input(connection, max_buffer_size)
-        if client_input:
-            num_aggs = int(client_input[0])
+        counter += 1
+
+        if client_input != ['']:
+            print_lock.acquire()
+            num_aggs_input = int(client_input[0])
             sm_id = int(client_input[1])
             value = int(client_input[2])
-            eu.set_num_aggs(int(num_aggs))
-            eu.add_sums(value, sm_id)
-            print(eu.return_values())
+            eu.set_num_aggs(int(num_aggs_input))
+            eu.set_spatial_sum(value)
+            eu.generate_bill(sm_id, value)
+
+            time.sleep(1)
+            print_lock.release()
+        else:
+            if print_cycle % num_aggs == 0:
+                print_lock.acquire()
+                print_cycle = 1
+                is_active = False
+                print_lock.release()
+
+            else:
+                print_lock.acquire()
+                print_cycle += 1
+                print_lock.release()
 
 
 def receive_input(connection, max_buffer_size):

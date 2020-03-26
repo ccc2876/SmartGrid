@@ -29,6 +29,7 @@ class Aggregator:
         self.lagrange = ""
         self.sumofshares= 0
         self.time = 0
+        self.vals_from_all_aggs= 0
 
     def update_billing_counters(self,value,meter_id):
         self.billing_dict[meter_id] = value
@@ -55,6 +56,7 @@ class Aggregator:
         return int(amount)
 
     def calculate_delta(self,zp=0):
+
         return int(self.spatial_counter * self.delta_func_multiplier)
 
     def set_lagrange(self, equation):
@@ -82,7 +84,8 @@ class Aggregator:
                 bottom *= (self.get_ID() - i)
         self.delta_func_multiplier = top / bottom
 
-
+    def set_vals_from_all_aggs(self,x):
+        self.vals_from_all_aggs +=1
 
     def get_ID(self):
         """
@@ -118,6 +121,7 @@ class Aggregator:
         :param value: the value that corresponds to the share multiplied by the delta func multiplier of the agg
         :param sm_id: the smart meter id
         """
+
         self.sumofshares += value
 
     def get_sum(self):

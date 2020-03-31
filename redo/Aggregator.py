@@ -8,7 +8,7 @@ from numpy import long
 
 NUM_TIME_INSTANCES = 10
 NUM_SMART_METERS = 5
-NUM_AGGREGATORS = 2
+NUM_AGGREGATORS = 3
 BILL_PRICE = 0
 ZP_SPACE = 0
 DEGREE = 0
@@ -20,7 +20,7 @@ AGG_CONNS = []
 eu_conn = None
 recv_shares_count = 0
 total_consump = 0
-
+AGGS = []
 lock = Lock()
 
 
@@ -136,45 +136,26 @@ def send_spatial_eu():
 
 def send_aggregators_spatial():
     global AGG_CONNS, aggregator
+    print("conns",AGG_CONNS)
     for conn in AGG_CONNS:
         value = aggregator.sumofshares
         conn.sendall(str(value).encode("utf-8"))
-
+        print("val",value)
 
 def recv_aggregators_spatial(max_buffer_size=5120):
     global AGG_CONNS, aggregator
+    print("CONNS",AGG_CONNS)
     for conn in AGG_CONNS:
+        print(conn)
         input = conn.recv(max_buffer_size)
+        print(input)
+        print(conn)
         while not input:
             input = conn.recv(max_buffer_size)
         decoded_input = input.decode("utf-8")
         aggregator.set_total_consumption(int(float(decoded_input)))
 
-# def do_stuff(meter_id,val):
-#     global recv_shares_count
-#     lock.acquire()
-#     aggregator.update_billing_dict(meter_id, val)
-#     aggregator.update_spatial_counter(val)
-#     constant = long(aggregator.get_spatial_counter()) * long(aggregator.get_lagrange_multiplier())
-#     aggregator.calc_sum(constant)
-#     recv_shares_count += 1
-#
-#     # spatial aggregation
-#     # tracemalloc.start()                            # uncomment this when checking for memory amount
-#     # start=time.time()                              # uncomment this when checking for time
-#     send_aggregators_spatial()
-#     recv_aggregators_spatial()
-#     send_spatial_eu()
-#
-#     aggregator.reset_spatial()
-#     # end= time.time()                               # uncomment this when checking for time
-#     # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
-#     # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
-#     # for stat in top_stats:                         # uncomment this when checking for memory amount
-#     #     print(stat)
-#     # print(end-start)                               # uncomment this when checking for time
-#     lock.release()
-#
+
 
 def communicate_smart_meter(conn):
     global sm_connections, NUM_TIME_INSTANCES, aggregator, eu_conn, recv_shares_count
@@ -185,16 +166,27 @@ def communicate_smart_meter(conn):
     print(shares_time_instances)
     meter_id = int(shares_time_instances[0])
     aggregator.update_billing_dict(meter_id, shares_time_instances[1])
+    print(aggregator.billing_dict)
     aggregator.update_spatial_counter(shares_time_instances[1])
+    print(aggregator.spatial_counter)
     constant = long(aggregator.get_spatial_counter()) * long(aggregator.get_lagrange_multiplier())
     aggregator.calc_sum(constant)
+    print(aggregator.sumofshares)
     recv_shares_count += 1
+    lock.release()
     # spatial aggregation
     # tracemalloc.start()                            # uncomment this when checking for memory amount
     # start=time.time()                              # uncomment this when checking for time
+    lock.acquire()
     send_aggregators_spatial()
+    lock.release()
+    lock.acquire()
     recv_aggregators_spatial()
+    lock.release()
+    lock.acquire()
     send_spatial_eu()
+    lock.release()
+    lock.acquire()
     aggregator.reset_spatial()
     # end= time.time()                               # uncomment this when checking for time
     # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
@@ -204,35 +196,36 @@ def communicate_smart_meter(conn):
     # print(end-start)                               # uncomment this when checking for time
     lock.release()
 
-def agg_server_setup():
+def agg_server_setup(num):
     global AGG_CONNS
     TCP_IP = '127.0.0.1'
     TCP_PORT = int(sys.argv[1]) + 7000
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
     print("Socket Created")
+    print(TCP_IP, " ", TCP_PORT)
     s.bind((TCP_IP, TCP_PORT))
     s.listen()
     print("Socket Listening")
-    while len(AGG_CONNS) < NUM_AGGREGATORS - 1:
+    while len(AGG_CONNS) < num-1:
         conn, addr = s.accept()
         AGG_CONNS.append(conn)
+        print('Connected to :', addr[0], ':', addr[1])
     print("All aggregators connected")
 
 
-def connect_to_aggs_as_client():
-    global NUM_AGGREGATORS, aggs_client_connections
+def connect_to_aggs_as_client(port):
+    global NUM_AGGREGATORS, aggs_client_connections, AGG_CONNS
     host = "127.0.0.1"
-    port = 7001
-    for i in range(0, NUM_AGGREGATORS - 1):
-        soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        AGG_CONNS.append(soc)
-        if not (port == int(sys.argv[1]) + 7000):
-            try:
-                soc.connect((host, port))
-            except:
-                print("Connection Error")
-                sys.exit()
-        port += 1
+    print(port)
+    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    if not (port == int(sys.argv[1]) + 7000):
+        try:
+            print(port)
+            soc.connect((host, port))
+        except:
+            print("Connection Error")
+            sys.exit()
 
 
 def send_aggregators_temporal(i):
@@ -311,17 +304,24 @@ def main():
     global aggregator, NUM_AGGREGATORS, AGG_CONNS, DEGREE, ZP_SPACE
     connect_to_eu()
     receive_data_eu()
-
+    counter = 1
     ID = int(sys.argv[1])
+    print(ID)
     port = 8000 + ID
 
     aggregator = Aggregator(ID)
     aggregator.calculate_lagrange_multiplier(NUM_AGGREGATORS)
-    if ID == 1:
-        agg_server_setup()
-    else:
-        time.sleep(.01)
-        connect_to_aggs_as_client()
+
+
+    for i in range(1, NUM_AGGREGATORS + 1):
+        agg_port = 7000 + counter
+        if ID == counter:
+            agg_server_setup(NUM_AGGREGATORS)
+        else:
+            time.sleep(1)
+            connect_to_aggs_as_client(agg_port)
+        counter +=1
+
 
     setup_sm_server(port)
     send_data_to_sm()
@@ -332,7 +332,6 @@ def main():
             try:
                 t = Thread(target=communicate_smart_meter, args=(conn,))
                 t.start()
-                time.sleep(0.25)
             except:
                 print("Thread did not start.")
                 traceback.print_exc()

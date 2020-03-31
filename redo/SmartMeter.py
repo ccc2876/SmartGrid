@@ -6,7 +6,7 @@ import socket
 import tracemalloc
 
 NUM_TIME_INSTANCES = 10
-NUM_AGGREGATORS = 2
+NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0
 MAX_COEFFICIENT = 4

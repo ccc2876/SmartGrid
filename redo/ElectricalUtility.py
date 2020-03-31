@@ -2,7 +2,7 @@ import socket
 import time
 from sympy import isprime
 
-NUM_AGGREGATORS = 2
+NUM_AGGREGATORS = 3
 NUM_SMART_METERS = 5
 connections = []
 MAX_CONSUMPTION = 10

@@ -21,40 +21,6 @@ lock =Lock()
 
 f = None
 
-def agg_server():
-    TCP_IP = '127.0.0.1'
-    TCP_PORT = int(sys.argv[1]) - 1000
-    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    s.bind((TCP_IP, TCP_PORT))
-
-    print(len(AGG_CONNS))
-    s.listen()
-    connect_to_aggs(s)
-
-
-def connect_to_aggs(s):
-    #function to connect to the other aggs
-    connections = []
-    host= "127.0.0.1"
-    port = 7001
-    for i in range(0, num_aggs):
-        if not (port == int(sys.argv[1])-1000):
-            print(port)
-            soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            connections.append(soc)
-            try:
-                soc.connect((host, port))
-                conn,addr = s.accept()
-                AGG_CONNS.append(conn)
-                print(conn)
-            except:
-                print("Connection Error")
-                sys.exit()
-        port +=1
-        time.sleep(9)
-    print(len(AGG_CONNS))
-
-
 
 def start_server(connections, eu_conn):
     global num_smart_meters, f
@@ -141,17 +107,7 @@ def clientThread(connection, aggregator, ip, port, eu_conn, num_sm, max_buffer_s
                 val = str(val) + DELIMITER
                 sending_string += val
                 lock.release()
-                for c in AGG_CONNS:
-                    print(c)
-                    c.sendall(sending_string.encode("utf-8"))
-                    print(c)
-                    value=int(receive_input(c, max_buffer_size))
-                    while not value:
-                        value = int(receive_input(c, max_buffer_size))
-                        print(value)
-                    lock.acquire()
-                    aggregator.set_vals_from_all_aggs(value)
-                    lock.release()
+                eu_conn.sendall(sending_string)
                 time.sleep(0.5)
                 lock.acquire()
                 aggregator.reset_spatial()
@@ -200,8 +156,6 @@ def main():
 
     connections = []
 
-    #set up connection to other aggregators
-    agg_server()
     print("connected to all aggs:")
 
     # start the set up and then close connections when finished

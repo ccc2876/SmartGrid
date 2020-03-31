@@ -7,8 +7,9 @@ from threading import Thread, Lock
 from numpy import long
 
 NUM_TIME_INSTANCES = 10
-NUM_SMART_METERS = 2
+NUM_SMART_METERS = 5
 NUM_AGGREGATORS = 2
+BILL_PRICE = 0
 ZP_SPACE = 0
 DEGREE = 0
 aggregator = None
@@ -130,14 +131,13 @@ def send_spatial_eu():
     total_consump = aggregator.total_consumption
     total_consump += aggregator.sumofshares
     eu_conn.sendall(str(total_consump).encode("utf-8"))
-    print("Total Consump:", total_consump)
+
 
 
 def send_aggregators_spatial():
     global AGG_CONNS, aggregator
     for conn in AGG_CONNS:
         value = aggregator.sumofshares
-        print("this agg val", value)
         conn.sendall(str(value).encode("utf-8"))
 
 
@@ -150,6 +150,31 @@ def recv_aggregators_spatial(max_buffer_size=5120):
         decoded_input = input.decode("utf-8")
         aggregator.set_total_consumption(int(float(decoded_input)))
 
+# def do_stuff(meter_id,val):
+#     global recv_shares_count
+#     lock.acquire()
+#     aggregator.update_billing_dict(meter_id, val)
+#     aggregator.update_spatial_counter(val)
+#     constant = long(aggregator.get_spatial_counter()) * long(aggregator.get_lagrange_multiplier())
+#     aggregator.calc_sum(constant)
+#     recv_shares_count += 1
+#
+#     # spatial aggregation
+#     # tracemalloc.start()                            # uncomment this when checking for memory amount
+#     # start=time.time()                              # uncomment this when checking for time
+#     send_aggregators_spatial()
+#     recv_aggregators_spatial()
+#     send_spatial_eu()
+#
+#     aggregator.reset_spatial()
+#     # end= time.time()                               # uncomment this when checking for time
+#     # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
+#     # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
+#     # for stat in top_stats:                         # uncomment this when checking for memory amount
+#     #     print(stat)
+#     # print(end-start)                               # uncomment this when checking for time
+#     lock.release()
+#
 
 def communicate_smart_meter(conn):
     global sm_connections, NUM_TIME_INSTANCES, aggregator, eu_conn, recv_shares_count
@@ -178,7 +203,6 @@ def communicate_smart_meter(conn):
     #     print(stat)
     # print(end-start)                               # uncomment this when checking for time
     lock.release()
-
 
 def agg_server_setup():
     global AGG_CONNS
@@ -214,8 +238,12 @@ def connect_to_aggs_as_client():
 def send_aggregators_temporal(i):
     global AGG_CONNS, aggregator
     for conn in AGG_CONNS:
+        # print("here")
         value = aggregator.bill_share_value[i]
+        # print("val:", value)
         conn.sendall(str(value).encode("utf-8"))
+        # print("Sent")
+    time.sleep(1)
 
 
 def recv_aggregators_temporal(i, max_buffer_size=5120):
@@ -225,8 +253,13 @@ def recv_aggregators_temporal(i, max_buffer_size=5120):
         while not input:
             input = conn.recv(max_buffer_size)
         decoded_input = input.decode("utf8")
+        # print("Recv")
+        # print(decoded_input)
+        lock.acquire()
         aggregator.set_consumption(i, int(float(decoded_input)))
-
+        lock.release()
+    # print(aggregator.consumption_dict)
+    time.sleep(1)
 
 def connect_to_eu():
     global eu_conn
@@ -242,15 +275,16 @@ def connect_to_eu():
 
 
 def receive_data_eu(max_buffer_size=5120):
-    global NUM_SMART_METERS, DEGREE, ZP_SPACE
+    global NUM_SMART_METERS, DEGREE, ZP_SPACE,BILL_PRICE
     input = eu_conn.recv(max_buffer_size)
     while not input:
         input = eu_conn.recv(max_buffer_size)
     decoded_input = input.decode("utf-8")
     values = decoded_input.split("\n")
-    DEGREE = int(values[0])
-    ZP_SPACE = int(values[1])
-    NUM_SMART_METERS = int(values[2])
+    BILL_PRICE= int(values[0])
+    DEGREE = int(values[1])
+    ZP_SPACE = int(values[2])
+    NUM_SMART_METERS = int(values[3])
     print(DEGREE, ZP_SPACE, NUM_SMART_METERS)
 
 
@@ -260,6 +294,18 @@ def send_data_to_sm():
     for conn in sm_connections:
         conn.sendall(send_string.encode("utf-8"))
 
+def create_bill_data():
+    global aggregator, BILL_PRICE
+    for i in range(1,len(aggregator.consumption_dict)+1):
+        aggregator.consumption_dict[i] = aggregator.consumption_dict[i] * BILL_PRICE
+
+def send_bill_data():
+    global aggregator, eu_conn
+    send_string = ""
+    for  i in range(1,len(aggregator.consumption_dict)+1):
+       send_string += str(i) + "\n"
+       send_string += str(aggregator.consumption_dict[i]) + "\n"
+    eu_conn.sendall(send_string.encode("utf-8"))
 
 def main():
     global aggregator, NUM_AGGREGATORS, AGG_CONNS, DEGREE, ZP_SPACE
@@ -281,12 +327,12 @@ def main():
     send_data_to_sm()
     send_bill = False
     for i in range(0, NUM_TIME_INSTANCES):
+    # while recv_shares_count < (NUM_TIME_INSTANCES * NUM_SMART_METERS):
         for conn in sm_connections:
             try:
                 t = Thread(target=communicate_smart_meter, args=(conn,))
                 t.start()
-
-
+                time.sleep(0.25)
             except:
                 print("Thread did not start.")
                 traceback.print_exc()
@@ -294,24 +340,27 @@ def main():
     while recv_shares_count < (NUM_TIME_INSTANCES * NUM_SMART_METERS):
         send_bill = False
     send_bill = True
-
+    time.sleep(2)
     # temporal aggregation
-    # print(aggregator.get_spatial_counter())
-    # if send_bill:
-    #     for i in range(1, NUM_SMART_METERS + 1):
-    #         # print("Starting memory trace...")
-    #         # tracemalloc.start()                             # uncomment this when checking for memory amount
-    #         aggregator.get_billing_amount(i)
-    #         # start = time.time()                             # uncomment this when checking for time
-    #         send_aggregators_temporal(i)
-    #         recv_aggregators_temporal(i)
-    #         # end = time.time()                               # uncomment this when checking for time
-    #         # snapshot = tracemalloc.take_snapshot()          # uncomment this when checking for memory amount
-    #         # top_stats = snapshot.statistics('lineno')       # uncomment this when checking for memory amount
-    #         # for stat in top_stats:                          # uncomment this when checking for memory amount
-    #         #     print(stat)
-    #         # print(end-start)                                # uncomment this when checking for time
+    if send_bill:
+        for i in range(1, NUM_SMART_METERS+1):
+            # print("Starting memory trace...")
+            # tracemalloc.start()                             # uncomment this when checking for memory amount
+            aggregator.get_billing_amount(i)
+            # start = time.time()                             # uncomment this when checking for time
+            send_aggregators_temporal(i)
+            recv_aggregators_temporal(i)
+            time.sleep(2)
+            # end = time.time()                               # uncomment this when checking for time
+            # snapshot = tracemalloc.take_snapshot()          # uncomment this when checking for memory amount
+            # top_stats = snapshot.statistics('lineno')       # uncomment this when checking for memory amount
+            # for stat in top_stats:                          # uncomment this when checking for memory amount
+            #     print(stat)
+            # print(end-start)                                # uncomment this when checking for time
     print(aggregator.consumption_dict)
+    create_bill_data()
+    print(aggregator.consumption_dict)
+    send_bill_data()
 
 
 if __name__ == '__main__':

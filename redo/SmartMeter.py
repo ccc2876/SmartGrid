@@ -141,12 +141,12 @@ def main():
         # start=time.time()                              # uncomment this when checking time
         send_shares()
         # end= time.time()                               # uncomment this when checking time
+        time.sleep(2)
         # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
         # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
         # for stat in top_stats:                         # uncomment this when checking for memory amount
         #     print(stat)                                # uncomment this when checking for memory amount
         # print(end-start)                               # uncomment this when checking time
-        time.sleep(1.5)
     print("Total:", total)
 
     # time.sleep(30)

@@ -5,7 +5,7 @@ import socket
 
 import tracemalloc
 
-NUM_TIME_INSTANCES = 10
+NUM_TIME_INSTANCES = 5
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0
@@ -141,7 +141,7 @@ def main():
         # start=time.time()                              # uncomment this when checking time
         send_shares()
         # end= time.time()                               # uncomment this when checking time
-        time.sleep(2)
+        time.sleep(10)
         # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
         # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
         # for stat in top_stats:                         # uncomment this when checking for memory amount

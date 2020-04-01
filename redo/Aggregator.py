@@ -6,7 +6,7 @@ import traceback
 from threading import Thread, Lock
 from numpy import long
 
-NUM_TIME_INSTANCES = 10
+NUM_TIME_INSTANCES = 5
 NUM_SMART_METERS = 5
 NUM_AGGREGATORS = 3
 BILL_PRICE = 0
@@ -16,7 +16,8 @@ aggregator = None
 aggs_client_connections = []
 server_conns = []
 sm_connections = []
-AGG_CONNS = []
+AGG_CONNS_SERVER = []
+AGG_CONNS_CLIENT = []
 eu_conn = None
 recv_shares_count = 0
 total_consump = 0
@@ -135,25 +136,22 @@ def send_spatial_eu():
 
 
 def send_aggregators_spatial():
-    global AGG_CONNS, aggregator
-    print("conns",AGG_CONNS)
-    for conn in AGG_CONNS:
+    global AGG_CONNS_SERVER, aggregator
+    for conn in AGG_CONNS_SERVER:
         value = aggregator.sumofshares
         conn.sendall(str(value).encode("utf-8"))
-        print("val",value)
+    # time.sleep(.5)
+
 
 def recv_aggregators_spatial(max_buffer_size=5120):
-    global AGG_CONNS, aggregator
-    print("CONNS",AGG_CONNS)
-    for conn in AGG_CONNS:
-        print(conn)
+    global AGG_CONNS_CLIENT, aggregator
+    for conn in AGG_CONNS_CLIENT:
         input = conn.recv(max_buffer_size)
-        print(input)
-        print(conn)
         while not input:
             input = conn.recv(max_buffer_size)
         decoded_input = input.decode("utf-8")
         aggregator.set_total_consumption(int(float(decoded_input)))
+        time.sleep(.5)
 
 
 
@@ -166,38 +164,14 @@ def communicate_smart_meter(conn):
     print(shares_time_instances)
     meter_id = int(shares_time_instances[0])
     aggregator.update_billing_dict(meter_id, shares_time_instances[1])
-    print(aggregator.billing_dict)
     aggregator.update_spatial_counter(shares_time_instances[1])
-    print(aggregator.spatial_counter)
     constant = long(aggregator.get_spatial_counter()) * long(aggregator.get_lagrange_multiplier())
     aggregator.calc_sum(constant)
-    print(aggregator.sumofshares)
     recv_shares_count += 1
-    lock.release()
-    # spatial aggregation
-    # tracemalloc.start()                            # uncomment this when checking for memory amount
-    # start=time.time()                              # uncomment this when checking for time
-    lock.acquire()
-    send_aggregators_spatial()
-    lock.release()
-    lock.acquire()
-    recv_aggregators_spatial()
-    lock.release()
-    lock.acquire()
-    send_spatial_eu()
-    lock.release()
-    lock.acquire()
-    aggregator.reset_spatial()
-    # end= time.time()                               # uncomment this when checking for time
-    # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
-    # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
-    # for stat in top_stats:                         # uncomment this when checking for memory amount
-    #     print(stat)
-    # print(end-start)                               # uncomment this when checking for time
     lock.release()
 
 def agg_server_setup(num):
-    global AGG_CONNS
+    global AGG_CONNS_SERVER
     TCP_IP = '127.0.0.1'
     TCP_PORT = int(sys.argv[1]) + 7000
     s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -207,18 +181,19 @@ def agg_server_setup(num):
     s.bind((TCP_IP, TCP_PORT))
     s.listen()
     print("Socket Listening")
-    while len(AGG_CONNS) < num-1:
+    while len(AGG_CONNS_SERVER) < num-1:
         conn, addr = s.accept()
-        AGG_CONNS.append(conn)
+        AGG_CONNS_SERVER.append(conn)
         print('Connected to :', addr[0], ':', addr[1])
     print("All aggregators connected")
 
 
 def connect_to_aggs_as_client(port):
-    global NUM_AGGREGATORS, aggs_client_connections, AGG_CONNS
+    global NUM_AGGREGATORS, aggs_client_connections, AGG_CONNS_CLIENT
     host = "127.0.0.1"
     print(port)
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    AGG_CONNS_CLIENT.append(soc)
     if not (port == int(sys.argv[1]) + 7000):
         try:
             print(port)
@@ -229,8 +204,8 @@ def connect_to_aggs_as_client(port):
 
 
 def send_aggregators_temporal(i):
-    global AGG_CONNS, aggregator
-    for conn in AGG_CONNS:
+    global AGG_CONNS_SERVER, aggregator
+    for conn in AGG_CONNS_SERVER:
         # print("here")
         value = aggregator.bill_share_value[i]
         # print("val:", value)
@@ -240,8 +215,8 @@ def send_aggregators_temporal(i):
 
 
 def recv_aggregators_temporal(i, max_buffer_size=5120):
-    global AGG_CONNS, aggregator
-    for conn in AGG_CONNS:
+    global AGG_CONNS_CLIENT, aggregator
+    for conn in AGG_CONNS_CLIENT:
         input = conn.recv(max_buffer_size)
         while not input:
             input = conn.recv(max_buffer_size)
@@ -301,7 +276,7 @@ def send_bill_data():
     eu_conn.sendall(send_string.encode("utf-8"))
 
 def main():
-    global aggregator, NUM_AGGREGATORS, AGG_CONNS, DEGREE, ZP_SPACE
+    global aggregator, NUM_AGGREGATORS, DEGREE, ZP_SPACE
     connect_to_eu()
     receive_data_eu()
     counter = 1
@@ -321,6 +296,16 @@ def main():
             time.sleep(1)
             connect_to_aggs_as_client(agg_port)
         counter +=1
+    # print(AGG_CONNS_SERVER)
+    # print(AGG_CONNS_CLIENT)
+    # for conn in AGG_CONNS_SERVER:
+    #     conn.sendall("hi".encode("utf-8"))
+    #
+    # for conn in AGG_CONNS_CLIENT:
+    #     input =conn.recv(5120)
+    #     while not input:
+    #         input = conn.recv(5120)
+    #     print(input.decode("utf-8"))
 
 
     setup_sm_server(port)
@@ -335,6 +320,21 @@ def main():
             except:
                 print("Thread did not start.")
                 traceback.print_exc()
+            # spatial aggregation
+            # tracemalloc.start()                            # uncomment this when checking for memory amount
+            # start=time.time()                              # uncomment this when checking for time
+            lock.acquire()
+            send_aggregators_spatial()
+            recv_aggregators_spatial()
+            send_spatial_eu()
+            aggregator.reset_spatial()
+            # end= time.time()                               # uncomment this when checking for time
+            # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
+            # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
+            # for stat in top_stats:                         # uncomment this when checking for memory amount
+            #     print(stat)
+            # print(end-start)                               # uncomment this when checking for time
+            lock.release()
 
     while recv_shares_count < (NUM_TIME_INSTANCES * NUM_SMART_METERS):
         send_bill = False

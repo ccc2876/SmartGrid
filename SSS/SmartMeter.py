@@ -194,12 +194,12 @@ def main():
     for stat in top_stats:                         # uncomment this when checking for memory amount
         print(stat)                                # uncomment this when checking for memory amount
 
-    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/bill_time_sm" + str(sm.get_ID()) + ".txt"
+    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/bill_time_sm" + str(sm.get_ID()) + ".txt"
     fs = open(filename, "w+")
     fs.write(str((bill_end-bill_start)-(sub_end-sub_start)) + "\n")
     fs.close()
 
-    filename= "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/share_creation_sm" +str(sm.get_ID()) + ".txt"
+    filename= "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/share_creation_sm" +str(sm.get_ID()) + ".txt"
     fs = open(filename, "w+")
     for val in share_creation_time:
         fs.write(str(val) + "\n")
@@ -207,7 +207,7 @@ def main():
 
     print("Total:", total)
 
-    filename2 = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/registration" + str(sm.get_ID())+ ".txt"
+    filename2 = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/registration" + str(sm.get_ID())+ ".txt"
     fs = open(filename2, "w+")
     fs.write(str(end_r - start) + "\n")
     fs.close()

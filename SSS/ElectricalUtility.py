@@ -132,13 +132,13 @@ def main():
     print(eu.bills_dict)
 
     # write time to files
-    filename_spatial = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/ElectricalUtilityFiles/time_spatial_eu.txt"
+    filename_spatial = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/ElectricalUtilityFiles/time_spatial_eu.txt"
     fs = open(filename_spatial, "w+")
     for val in time_spatial:
         fs.write(str(val) + "\n")
     fs.close()
 
-    filename_temporal = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/ElectricalUtilityFiles/time_temporal_eu.txt"
+    filename_temporal = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/ElectricalUtilityFiles/time_temporal_eu.txt"
     ft = open(filename_temporal, "w+")
     for val in time_temporal:
         ft.write(str(val) + "\n")

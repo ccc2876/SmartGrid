@@ -372,12 +372,12 @@ def main():
         send_bill_data_sm(i)
 
     # write time to files
-    filename_spatial = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/AggregatorFiles/time_spatial_agg" + str(ID) + ".txt"
+    filename_spatial = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/AggregatorFiles/time_spatial_agg" + str(ID) + ".txt"
     fs = open(filename_spatial, "w+")
     for val in time_spatial:
         fs.write(str(val) + "\n")
 
-    filename_temporal = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/AggregatorFiles/time_temporal_agg" + str(ID) + ".txt"
+    filename_temporal = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/AggregatorFiles/time_temporal_agg" + str(ID) + ".txt"
     ft = open(filename_temporal, "w+")
     for val in time_temporal:
         ft.write(str(val) + "\n")

@@ -5,7 +5,7 @@ import socket
 
 import tracemalloc
 
-NUM_TIME_INSTANCES = 5
+NUM_TIME_INSTANCES = 10
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0
@@ -13,6 +13,11 @@ MAX_COEFFICIENT = 4
 MAX_CONSUMPTION = 10
 connections = []
 sm = None
+eu_conn = None
+start= 0
+sub_start =0
+sub_end = 0
+share_creation_time  = []
 
 
 class SmartMeter:
@@ -21,6 +26,10 @@ class SmartMeter:
         self.polynomial = []
         self.degree = DEGREE
         self.secret = 0
+        self.bill = 0
+
+    def set_bill(self, bill):
+        self.bill = bill
 
     def get_ID(self):
         return self.ID
@@ -104,29 +113,55 @@ def send_shares():
     # return sum_one,sum_two
 
 def get_initialization_data(connections,max_buffer_size=5120):
-    global DEGREE, ZP_SPACE
-    for conn in connections:
-        input = conn.recv(max_buffer_size)
-        while not input:
-            input = conn.recv(max_buffer_size)
-        decoded_input = input.decode("utf-8")
-        values= decoded_input.split("\n")
-        DEGREE= int(values[0])
-        ZP_SPACE = int(values[1])
+    global DEGREE, ZP_SPACE,start
+    input = eu_conn.recv(max_buffer_size)
+    while not input:
+        input = eu_conn.recv(max_buffer_size)
+
+    start = time.time()  # uncomment this when checking time
+    decoded_input = input.decode("utf-8")
+    values= decoded_input.split("\n")
+    DEGREE= int(values[0])
+    ZP_SPACE = int(values[1])
     print("Degree:", DEGREE)
     print("ZP:", ZP_SPACE)
 
+def connect_to_eu():
+    global eu_conn
+    eu_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
+    host = "127.0.0.1"
+    port = 7999
+    # try:
+    eu_conn.connect((host, port))
+    # except:
+    #     print("Connection Error")
+    #     sys.exit()
+
+def receive_bill():
+    global connections, sm,sub_start,sub_end
+    sub_start = time.time()
+    for conn in connections:
+        inp = conn.recv(5120)
+        while not inp:
+            inp = conn.recv(5120)
+        sub_end = time.time()
+        decoded_input = inp.decode("utf-8")
+        sm.set_bill(int(float(decoded_input)))
 def main():
-    global sm, NUM_TIME_INSTANCES,connections
+    global sm, NUM_TIME_INSTANCES,connections,eu_conn,start, sub_start,sub_end
+    # tracemalloc.start()  # uncomment this when checking for memory amount
+    connect_to_eu()
+    get_initialization_data(eu_conn)
+    end_r= time.time()                               # uncomment this when checking time
+    # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
+    # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
+    # for stat in top_stats:                         # uncomment this when checking for memory amount
+    #     print(stat)                                # uncomment this when checking for memory amount
+    print("Registration:", end_r-start)                               # uncomment this when checking time
 
     setup_connection()
-    get_initialization_data(connections)
     initialization()
-    #send the sm id to the aggs
-    # for conn in connections:
-    #     send = str(sm.get_ID()) + " "
-    #     conn.sendall(send.encode("utf-8"))
     total = 0
 
     #run for number of time instances
@@ -138,18 +173,45 @@ def main():
         print("Secret: ", secret)
         sm.set_secret(secret)
         # tracemalloc.start()                            # uncomment this when checking for memory amount
-        # start=time.time()                              # uncomment this when checking time
+        start_create=time.time()                              # uncomment this when checking time
         send_shares()
-        # end= time.time()                               # uncomment this when checking time
-        time.sleep(10)
+        end_create= time.time()                               # uncomment this when checking time
+        time.sleep(.01)
         # snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
         # top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
         # for stat in top_stats:                         # uncomment this when checking for memory amount
         #     print(stat)                                # uncomment this when checking for memory amount
-        # print(end-start)                               # uncomment this when checking time
+        print(end_create-start_create)                               # uncomment this when checking time
+        share_creation_time.append(end_create-start_create)
+    print("sum", sum(share_creation_time))
+    tracemalloc.start()
+    bill_start = time.time()
+    receive_bill()
+    bill_end = time.time()
+    print("Bill: ", sm.bill)
+    snapshot = tracemalloc.take_snapshot()         # uncomment this when checking for memory amount
+    top_stats = snapshot.statistics('lineno')      # uncomment this when checking for memory amount
+    for stat in top_stats:                         # uncomment this when checking for memory amount
+        print(stat)                                # uncomment this when checking for memory amount
+
+    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/bill_time_sm" + str(sm.get_ID()) + ".txt"
+    fs = open(filename, "w+")
+    fs.write(str((bill_end-bill_start)-(sub_end-sub_start)) + "\n")
+    fs.close()
+
+    filename= "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/share_creation_sm" +str(sm.get_ID()) + ".txt"
+    fs = open(filename, "w+")
+    for val in share_creation_time:
+        fs.write(str(val) + "\n")
+    fs.close()
+
     print("Total:", total)
 
-    # time.sleep(30)
+    filename2 = "/Users/clairecasalnova/PycharmProjects/SmartGrid/redo/SmartMeterFiles/registration" + str(sm.get_ID())+ ".txt"
+    fs = open(filename2, "w+")
+    fs.write(str(end_r - start) + "\n")
+    fs.close()
+
 
 if __name__ == '__main__':
     main()

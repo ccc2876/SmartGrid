@@ -15,7 +15,9 @@ num_sm = 2
 total_readings = 1
 time_instances = 1
 server_done = False
-
+SM_CONN_SERVER = []
+SM_CONN_CLIENT = []
+eu_conn = None
 lock = Lock()
 
 
@@ -54,22 +56,7 @@ def receive_input(connection, max_buffer_size=5120):
     return decoded_input
 
 
-def setup_client(host, port):
-    soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    print("host", host)
-    print("port", port)
-    print(soc)
-
-    try:
-        soc.connect((host, int(port)))
-        port += 1
-    except:
-        print("Connection Error")
-        sys.exit()
-    return soc
-
-
-def server_client_func(soc):
+def get_key(soc):
     global n, g
     inp = receive_input(soc)
     values = inp.split(" ")
@@ -80,117 +67,107 @@ def server_client_func(soc):
     return public_key
 
 
-def only_client_func(soc):
-    global n, g
-
-    inp = receive_input(soc)
-    values = inp.split(" ")
-    n = int(values[0])
-    g = int(values[1])
-    print("n", n)
-    print("g", g)
-
-    for i in range(0, time_instances):
-        read = get_readings()
-        encrypted_val = encrypt(read)
-        soc.sendall(str(encrypted_val).encode("utf-8"))
-
-
-def wait_on_values(soc, public_key, queue):
-    global total_count, num_sm, total_readings, server_done
-    start = time.time()
-    soc.sendall(str(public_key).encode("utf-8"))
-
-    if not server_done:
-        for i in range(0, time_instances):
-            read = get_readings()
-            lock.acquire()
-            total_readings *= int(encrypt(read))
-            server_done = True
-            total_count += 1
-            lock.release()
-    for i in range(0, time_instances):
-        lock.acquire()
-        inp = receive_input(soc)
-        while not inp:
-            inp = receive_input(soc)
-        total_readings *= int(inp)
-        print("tr:", total_readings)
-        print("tc", total_count)
-        lock.release()
-
-        # time.sleep(1)
-
-    end = time.time()
-    print(end-start)
-def send_final(soc, final):
-    print(final)
+def send_final(soc):
+    print(total_readings)
     lock.acquire()
-    soc.sendall(str(final).encode("utf-8"))
+    soc.sendall(str(total_readings).encode("utf-8"))
     lock.release()
 
+def sm_server_setup(host, port):
+    global SM_CONN_SERVER
+    TCP_IP = host
+    TCP_PORT = port
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    s.setsockopt(socket.SOL_SOCKET, socket.SO_KEEPALIVE, 1)
+    print("Socket Created")
+    print(TCP_IP, " ", TCP_PORT)
+    s.bind((TCP_IP, TCP_PORT))
+    s.listen()
+    print("Socket Listening")
+    while len(SM_CONN_SERVER) < num_sm - 1:
+        conn, addr = s.accept()
+        SM_CONN_SERVER.append(conn)
+        print('Connected to :', addr[0], ':', addr[1])
+    print("All SM connected")
 
-def setup_special_sm(host, port, is_server=1):
-    conn = setup_client(host, port)
-    public_key = server_client_func(conn)
-    start_server(public_key, conn)
-
-
-def start_server(public_key, conn):
-    global num_sm
-    # sets up server for connections to other smart meters
-    sm_connections = []
-    host = "127.0.0.1"  # will be VM ip
-    port = 8001  # make the id of smart meter + 8000
+def connect_to_sm_as_client(host, port):
+    global SM_CONN_CLIENT
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    print("Socket created")
-    try:
-        soc.bind((host, port))
-    except:
-        print("Bind failed. Error : " + str(sys.exc_info()))
-        sys.exit()
-    soc.listen(num_sm - 1)  # queue up to num sm request
-    print("Socket now listening on port ", port)
-    queue = Queue()
-
-    print("len", len(sm_connections))
-    print(num_sm - 1)
-    total = 0
-    while len(sm_connections) <= (num_sm - 2):
-        connection, address = soc.accept()
-        sm_connections.append(connection)
-        ip, port = str(address[0]), int(address[1])
-        print("Connected with " + ip + ":" + str(port))
-        port += 1
-        start= time.time()
+    SM_CONN_CLIENT.append(soc)
+    if not (port == int(sys.argv[1]) + 8000):
         try:
-            t = Thread(target=wait_on_values, args=(connection, public_key, queue))
-            t.start()
-            t.join()
+            soc.connect((host, port))
         except:
-            print("Thread did not start.")
-            traceback.print_exc()
-        end= time.time()
-        total += end-start
-    print("tot", total)
+            print("Connection Error")
+            sys.exit()
 
-    send_final(conn, int((total_readings % (n ** 2))))
+
+def connect_to_eu():
+    global eu_conn
+    eu_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+    host = "127.0.0.1"
+    port = 8000
+    try:
+        eu_conn.connect((host, port))
+    except:
+        print("Connection Error")
+        sys.exit()
+
+
+
+def send_to_sm():
+    global SM_CONN_SERVER,total_readings
+    for conn in SM_CONN_SERVER:
+        conn.sendall(str(total_readings).encode("utf-8"))
+
+
+def recv_from_sm(max_buffer_size=5120):
+    global SM_CONN_CLIENT,total_readings
+    for conn in SM_CONN_CLIENT:
+        input = conn.recv(max_buffer_size)
+        while not input:
+            input = conn.recv(max_buffer_size)
+        decoded_input = input.decode("utf-8")
+        total_readings*= int(decoded_input)
+        print(total_readings)
 
 
 def main():
-    global n, g
+    global n, g, time_instances, eu_conn,total_readings
+    counter = 1
+    host = "127.0.0.1"
+    ID = int(sys.argv[1])
+    print(counter, " ", ID)
+    port = ID + 8000
 
-    host = sys.argv[1]
-    port = int(sys.argv[2])
-    is_server = int(sys.argv[3])  # boolean flag for special smart meter
-    print(is_server)
-    if is_server:
-        setup_special_sm(host, port)
-    else:
-        conn = setup_client(host, port)
-        only_client_func(conn)
-        time.sleep(1)
+    for i in range(0, num_sm):
+        sm_port = 8000 + counter
+        if ID == counter:
+            sm_server_setup(host, port)
+        else:
+            time.sleep(1)
+            connect_to_sm_as_client(host, sm_port)
+        counter += 1
+
+    connect_to_eu()
+    public_key = get_key(eu_conn)
+
+    for i in range(0,time_instances):
+        val = get_readings()
+        encrypted = encrypt(val)
+        total_readings*= encrypted
+        print(total_readings)
+        send_to_sm()
+        recv_from_sm()
+
+
+    send_final(eu_conn)
+
+
+
+
+
 
 
 if __name__ == '__main__':

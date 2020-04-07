@@ -8,7 +8,7 @@ from memory_profiler import profile
 #implement once per month
 #implement and every time instance
 
-num_sm = 2
+num_sm = 10
 price_per_unit = 2
 # the EU private key for decryption
 private_key = -1
@@ -30,24 +30,20 @@ def generate_keys():
     print("g",g)
     return n, g
 
-@profile
 def decrypt(value):
     global private_key, n, g
-    start =time.perf_counter()
     top = numpy.long(pow(value, int(private_key), n**2))
     bottom = numpy.long(pow(g, int(private_key), n**2))
     top = L(top)
     bottom = L(bottom)
     bottom = sympy.mod_inverse(int(bottom), int(n))
     result = (top * bottom) % n
-    end = time.perf_counter()
-    print(end-start)
     return result
 
 
 def L(val):
     global n
-    return (val - 1) / n
+    return (val - 1) // n
 
 
 def receive_input(connection, max_buffer_size = 5120):
@@ -78,7 +74,7 @@ def process_input(input_str):
 def main():
     # set up the server
     connections = []
-    host = "129.21.67.132"  # will be VM ip
+    host = "127.0.0.1"  # will be VM ip
     port = 8000  # always port 8000
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -97,19 +93,23 @@ def main():
         connections.append(connection)
         ip, port = str(address[0]), str(address[1])
         print("Connected with " + ip + ":" + port)
+    start =time.time()
 
     for conn in connections:
+        total = 0
+        value = 0
         send_string = str(price_per_unit) + " " + str(n) + " " + str(g)
         conn.sendall(str(send_string).encode("utf-8"))
-        value = receive_input(conn)
-        print(value)
-        while value == "":
-            print("her")
+        for i in range(0,10):
             value = receive_input(conn)
-        print(value)
-
-        print("Bill: ", decrypt(int(value)))
-
+            print(value)
+            while value == "":
+                value = receive_input(conn)
+            print(value)
+            total*=int(value)
+        print("Bill: ", decrypt(int(total)))
+    end= time.time()
+    print(end-start- (num_sm*0.1))
 
 
 

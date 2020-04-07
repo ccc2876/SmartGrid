@@ -14,9 +14,9 @@ g = -1
 
 
 def generate_keys():
-	"""
-	generate public and private key 
-	"""
+    """
+    generate public and private key
+    """
     global private_key, n, g
     # hard code these
     # set these to be higher than SSS
@@ -31,11 +31,11 @@ def generate_keys():
     return n, g
 
 
-@profile # how the program determines the memory usage
+
 def decrypt(value):
-	"""
-	paillier homomorphic decryption technique to recover values sent by smart meter
-	"""
+    """
+    paillier homomorphic decryption technique to recover values sent by smart meter
+    """
     global private_key, n, g
     start = time.perf_counter()
     top = numpy.long(pow(value, int(private_key), n**2))
@@ -50,12 +50,12 @@ def decrypt(value):
 
 
 def L(val):
-	"""
-	auxilliary function for decryption
-	"""
+    """
+    auxilliary function for decryption
+    """
     global n
-    print("val", (val - 1) / n)
-    return (val - 1) / n
+    print("val", (val - 1) // n)
+    return (val - 1) // n
 
 
 def receive_input(connection, max_buffer_size = 5120):
@@ -86,7 +86,7 @@ def process_input(input_str):
 def main():
     # set up the server
     connections = []
-    host = "129.21.67.132"  # will be VM ip
+    host = "127.0.0.1"  # will be VM ip
     port = 8000  # always port 8000
     soc = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     soc.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -108,7 +108,7 @@ def main():
     send = str(n) + " " + str(g)
     connection.sendall(send.encode("utf-8"))
 
-	#wait to receive input
+    #wait to receive input
     value = receive_input(connection)
     print(value)
     while value == "":

@@ -4,11 +4,11 @@ import tracemalloc
 from sympy import isprime
 
 NUM_AGGREGATORS = 3
-NUM_SMART_METERS = 10
+NUM_SMART_METERS = 100
 agg_connections = []
 sm_connections = []
 MAX_CONSUMPTION = 10
-NUM_TIME_INSTANCES = 10
+NUM_TIME_INSTANCES = 20
 ZP_SPACE = 0
 BILL_PRICE = 2
 eu = None
@@ -61,14 +61,17 @@ def get_spatial_results(conn, max_buffer_size=5120):
 
 
 def get_bills(conn, max_buffer_size=5120):
-    global eu, NUM_SMART_METERS
+    global eu, NUM_SMART_METERS, time_temporal
     inp = conn.recv(max_buffer_size)
     while not input:
         inp = conn.recv(max_buffer_size)
+    start = time.time()
     decoded_input = inp.decode("utf-8")
     values = decoded_input.split("\n")
     for i in range(0, NUM_SMART_METERS * 2, 2):
         eu.bills_dict[int(values[i])] = int(float(values[i + 1]))
+    end = time.time()
+    time_temporal.append(end - start)
 
 
 def main():
@@ -103,32 +106,19 @@ def main():
         sm_connections.append(conn)
     send_data_sm()
     print("Spatial")
-    for i in range(0, (NUM_TIME_INSTANCES * NUM_SMART_METERS)):
+    for i in range(0, NUM_TIME_INSTANCES * NUM_SMART_METERS):
         for conn in agg_connections:
-            # tracemalloc.start()  # uncomment this when checking for memory amount
             start = time.time()
             get_spatial_results(conn)
             end = time.time()
-
             time_spatial.append(end - start)
-    # snapshot = tracemalloc.take_snapshot()  # uncomment this when checking for memory amount
-    # top_stats = snapshot.statistics('lineno')  # uncomment this when checking for memory amount
-    # for stat in top_stats:  # uncomment this when checking for memory amount
-    #     print(stat)
-    # print("\n\n\n\n\n")
 
     print("Spatial Sum: ", eu.get_spatial_value())
-    # tracemalloc.start()
     print("Temporal")
-    start = time.time()
+
     for conn in agg_connections:
         get_bills(conn)
-    end = time.time()
-    # snapshot = tracemalloc.take_snapshot()  # uncomment this when checking for memory amount
-    # top_stats = snapshot.statistics('lineno')  # uncomment this when checking for memory amount
-    # for stat in top_stats:  # uncomment this when checking for memory amount
-    #     print(stat)
-    time_temporal.append(end - start)
+
     print(eu.bills_dict)
 
     # write time to files

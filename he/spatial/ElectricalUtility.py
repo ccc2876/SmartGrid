@@ -11,6 +11,8 @@ from memory_profiler import profile
 private_key = -1
 n = -1
 g = -1
+num_sm = 2
+consumption = 0
 
 
 def generate_keys():
@@ -84,6 +86,7 @@ def process_input(input_str):
 
 
 def main():
+    global consumption, num_sm, n, g
     # set up the server
     connections = []
     host = "127.0.0.1"  # will be VM ip
@@ -96,28 +99,28 @@ def main():
     except:
         print("Bind failed. Error : " + str(sys.exc_info()))
         sys.exit()
-    soc.listen(1)  # queue up to 1 request
+    soc.listen()  # queue up to 1 request
     print("Socket now listening")
 
+    while len(connections) < num_sm:
+        connection, address = soc.accept()
+        connections.append(connection)
+        ip, port = str(address[0]), str(address[1])
+        print("Connected with " + ip + ":" + port)
+        n, g = generate_keys()
+        send = str(n) + " " + str(g)
+        connection.sendall(send.encode("utf-8"))
 
-    connection, address = soc.accept()
-    connections.append(connection)
-    ip, port = str(address[0]), str(address[1])
-    print("Connected with " + ip + ":" + port)
-    n, g = generate_keys()
-    send = str(n) + " " + str(g)
-    connection.sendall(send.encode("utf-8"))
-
-    #wait to receive input
-    value = receive_input(connection)
-    print(value)
-    while value == "":
+    for connection in connections:
+        #wait to receive input
         value = receive_input(connection)
         print(value)
+        while value == "":
+            value = receive_input(connection)
+            print(value)
+        consumption = decrypt(int(value))
 
-    print("pre d", long(value))
-    print("final: ", decrypt(long(value)))
-
+    print("Final:", consumption)
 
 
 if __name__ == "__main__":

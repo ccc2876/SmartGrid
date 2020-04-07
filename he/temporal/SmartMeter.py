@@ -1,6 +1,7 @@
 import socket
 import sys
 import random
+import time
 
 g = -1
 n = -1
@@ -12,9 +13,10 @@ def get_readings():
     global price_per_unit
     # will be read from csv file REMEMBER TO SUM THE ROWS EVENTUALY
     read = random.randint(1, 10)
-    read = read * price_per_unit
+    cost = read * price_per_unit
     print("Read", read)
-    return read
+    print("Cost", cost)
+    return cost
 
 
 def encrypt(read):
@@ -69,9 +71,11 @@ def main():
     price_per_unit = int(inp[0])
     n = int(inp[1])
     g = int(inp[2])
-    value = encrypt(get_readings())
-    print(value)
-    soc.sendall(str(value).encode("utf-8"))
+    for i in range(0,10):
+        value = encrypt(get_readings())
+        print(value)
+        soc.sendall(str(value).encode("utf-8"))
+        time.sleep(.01)
 
 
 

@@ -11,7 +11,7 @@ from threading import Thread, Lock
 g = -1
 n = -1
 total_count = 0
-num_sm = 3
+num_sm = 2
 total_readings = 1
 time_instances = 1
 server_done = False
@@ -20,7 +20,6 @@ lock = Lock()
 
 
 def get_readings():
-    file = open("../data.txt", "r")
     # will be read from csv file REMEMBER TO SUM THE ROWS EVENTUALY
     read = random.randint(1, 10)
     print("Read", int(read))
@@ -33,7 +32,7 @@ def encrypt(read):
     r = random.randint(1, 10)
     encrypted_val = ((g ** read) * (r ** n)) % (n ** 2)
     end = time.time()
-    print(end-start)
+    print(end - start)
     print("e", encrypted_val)
 
     return encrypted_val
@@ -99,6 +98,7 @@ def only_client_func(soc):
 
 def wait_on_values(soc, public_key, queue):
     global total_count, num_sm, total_readings, server_done
+    start = time.time()
     soc.sendall(str(public_key).encode("utf-8"))
 
     if not server_done:
@@ -111,13 +111,18 @@ def wait_on_values(soc, public_key, queue):
             lock.release()
     for i in range(0, time_instances):
         lock.acquire()
-        total_readings *= int(receive_input(soc))
+        inp = receive_input(soc)
+        while not inp:
+            inp = receive_input(soc)
+        total_readings *= int(inp)
         print("tr:", total_readings)
         print("tc", total_count)
         lock.release()
-        time.sleep(1)
 
+        # time.sleep(1)
 
+    end = time.time()
+    print(end-start)
 def send_final(soc, final):
     print(final)
     lock.acquire()
@@ -151,12 +156,14 @@ def start_server(public_key, conn):
 
     print("len", len(sm_connections))
     print(num_sm - 1)
+    total = 0
     while len(sm_connections) <= (num_sm - 2):
         connection, address = soc.accept()
         sm_connections.append(connection)
         ip, port = str(address[0]), int(address[1])
         print("Connected with " + ip + ":" + str(port))
         port += 1
+        start= time.time()
         try:
             t = Thread(target=wait_on_values, args=(connection, public_key, queue))
             t.start()
@@ -164,6 +171,9 @@ def start_server(public_key, conn):
         except:
             print("Thread did not start.")
             traceback.print_exc()
+        end= time.time()
+        total += end-start
+    print("tot", total)
 
     send_final(conn, int((total_readings % (n ** 2))))
 

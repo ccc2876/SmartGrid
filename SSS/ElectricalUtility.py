@@ -1,5 +1,6 @@
 import socket
 import time
+import sys
 import tracemalloc
 from sympy import isprime
 
@@ -10,19 +11,33 @@ sm_connections = []
 MAX_CONSUMPTION = 10
 NUM_TIME_INSTANCES = 20
 ZP_SPACE = 0
-BILL_PRICE = 2
+
 eu = None
 time_spatial = []
 time_temporal = []
 
 
 class ElectricalUtility:
-    def __init__(self):
+    def __init__(self,billing_method,bill_string):
         self.bills_dict = dict()
         self.spatial_value = 0
+        self.billing_method= billing_method
 
         for i in range(1, NUM_SMART_METERS + 1):
             self.bills_dict[i] = 0
+
+        if billing_method ==1:
+            self.bill_price =int(bill_string)
+        elif billing_method == 2:
+            bills =bill_string.split(";")
+            self.price_dict = {}
+            for entry in bills:
+                keyval =entry.split(",")
+                key = int(keyval[0])
+                val = int(keyval[1])
+                self.price_dict.__setitem__(key,val)
+            print(self.price_dict)
+
 
     def set_spatial_value(self, value):
         self.spatial_value = value
@@ -31,14 +46,21 @@ class ElectricalUtility:
         return self.spatial_value
 
 
+
+
 def send_data():
-    global NUM_AGGREGATORS, NUM_TIME_INSTANCES, MAX_CONSUMPTION, ZP_SPACE, agg_connections, NUM_SMART_METERS
+    global NUM_AGGREGATORS, NUM_TIME_INSTANCES, MAX_CONSUMPTION, ZP_SPACE, agg_connections, NUM_SMART_METERS,eu
     val = NUM_TIME_INSTANCES * MAX_CONSUMPTION
     while not isprime(val):
         val += 1
     ZP_SPACE = val
     degree = NUM_AGGREGATORS - 1
-    send_string = str(BILL_PRICE) + "\n" + str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_SMART_METERS)
+    if eu.billing_method == 1:
+        send_string = str(eu.bill_price) + "\n" + str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_SMART_METERS)
+    elif eu.billing_method == 2:
+        send_string = str(eu.price_dict) + "\n" + str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_SMART_METERS)
+    else:
+        send_string = str(eu.bill_price) + "\n" + str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_SMART_METERS)
     for conn in agg_connections:
         conn.sendall(send_string.encode("utf-8"))
 
@@ -74,9 +96,10 @@ def get_bills(conn, max_buffer_size=5120):
     time_temporal.append(end - start)
 
 
-def main():
+def main(billing_method, bill_string):
     global eu
-    eu = ElectricalUtility()
+    eu =ElectricalUtility(billing_method,bill_string)
+
     global agg_connections, sm_connections, NUM_AGGREGATORS, NUM_TIME_INSTANCES, time_spatial, time_temporal
     host = "127.0.0.1"
     port_agg = 8000
@@ -105,6 +128,8 @@ def main():
         conn, addr = s_sm.accept()
         sm_connections.append(conn)
     send_data_sm()
+
+
     print("Spatial")
     for i in range(0, NUM_TIME_INSTANCES * NUM_SMART_METERS):
         for conn in agg_connections:
@@ -136,4 +161,24 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    print("Please enter the number for the preferred billing method:   ")
+    print("\t1. linear")
+    print("\t2. cumulative")
+    print("\t3. interval")
+    billing_method=int(input())
+    if billing_method == 1:
+        print("Please enter the price per unit: ")
+        bill_string = input()
+    elif billing_method == 2:
+        print("Please enter billing chart in the form \n\t5,2;10,3;15,1\n"
+              "Where the first number is the max value for that range and the second value is the price per unit in that range")
+        bill_string =input()
+    else:
+        print("Please enter the number of time instances until a new price change: ")
+        change = int(input())
+        print("Please enter the price for 0-"+str(change)+" time instances:")
+        first_price = int(input())
+        print("Please enter the price for the time instances after " + str(change)+" time instances:")
+        second_price = int(input())
+        bill_string = str(change) + " " + str(first_price) + " " + str(second_price)
+    main(billing_method,bill_string)

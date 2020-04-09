@@ -3,6 +3,8 @@ import socket
 import sys
 import traceback
 import time
+import json
+from phe import paillier
 from numpy import long
 from queue import Queue
 from threading import Thread, Lock
@@ -10,15 +12,17 @@ from threading import Thread, Lock
 #
 g = -1
 n = -1
+r= -1
 total_count = 0
 num_sm = 2
 total_readings = 1
-time_instances = 1
+time_instances = 2
 server_done = False
 SM_CONN_SERVER = []
 SM_CONN_CLIENT = []
 eu_conn = None
 lock = Lock()
+
 
 
 def get_readings():
@@ -29,15 +33,14 @@ def get_readings():
 
 
 def encrypt(read):
-    global g, n
-    start = time.time()
-    r = random.randint(1, 10)
-    encrypted_val = ((g ** read) * (r ** n)) % (n ** 2)
-    end = time.time()
-    print(end - start)
-    print("e", encrypted_val)
-
-    return encrypted_val
+    global g, n,r
+    # start = time.time()
+    print("Message:\t", read)
+    k1 = pow(g, read, n * n)
+    k2 = pow(r, n, n * n)
+    cipher = (k1 * k2) % (n * n)
+    print(cipher)
+    return cipher
 
 
 def receive_input(connection, max_buffer_size=5120):
@@ -62,13 +65,16 @@ def get_key(soc):
     values = inp.split(" ")
     n = int(values[0])
     g = int(values[1])
+    r = int(values[2])
     print("pub", n, g)
-    public_key = str(n) + " " + str(g)
+    public_key = str(n) + " " + str(g) + " "  +str(r)
     return public_key
 
 
+
 def send_final(soc):
-    print(total_readings)
+    global total_readings
+    print("Final send:", total_readings)
     lock.acquire()
     soc.sendall(str(total_readings).encode("utf-8"))
     lock.release()
@@ -116,21 +122,24 @@ def connect_to_eu():
 
 
 
-def send_to_sm():
+def send_to_sm(encrypted):
     global SM_CONN_SERVER,total_readings
+    total_readings*= encrypted
+    print("Cipher:\t\t", encrypted)
     for conn in SM_CONN_SERVER:
         conn.sendall(str(total_readings).encode("utf-8"))
 
 
 def recv_from_sm(max_buffer_size=5120):
-    global SM_CONN_CLIENT,total_readings
+    global SM_CONN_CLIENT,total_readings, n
     for conn in SM_CONN_CLIENT:
-        input = conn.recv(max_buffer_size)
-        while not input:
-            input = conn.recv(max_buffer_size)
-        decoded_input = input.decode("utf-8")
-        total_readings*= int(decoded_input)
-        print(total_readings)
+        inp = conn.recv(max_buffer_size)
+        while not inp:
+            inp = conn.recv(max_buffer_size)
+        decoded_input = inp.decode("utf-8")
+        value = int(decoded_input)
+        total_readings*= value
+        total_readings = total_readings % (n * n )
 
 
 def main():
@@ -151,17 +160,15 @@ def main():
         counter += 1
 
     connect_to_eu()
-    public_key = get_key(eu_conn)
+    get_key(eu_conn)
 
     for i in range(0,time_instances):
         val = get_readings()
         encrypted = encrypt(val)
-        total_readings*= encrypted
-        print(total_readings)
-        send_to_sm()
+        send_to_sm(encrypted)
         recv_from_sm()
-
-
+        time.sleep(1)
+        print(total_readings)
     send_final(eu_conn)
 
 

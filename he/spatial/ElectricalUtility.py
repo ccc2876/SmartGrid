@@ -1,36 +1,52 @@
 import numpy
-import sympy
+import libnum
 import socket
 import sys
 import time
+import json
+from random import randint
 from numpy import long
 from memory_profiler import profile
 
 
 # the EU private key for decryption
-private_key = -1
 n = -1
 g = -1
+r = -1
+L =-1
+gMu = -1
 num_sm = 2
 consumption = 0
+gLambda = 0
 
 
 def generate_keys():
     """
     generate public and private key
     """
-    global private_key, n, g
-    # hard code these
-    # set these to be higher than SSS
+    global  n, g, gLambda, l , gMu,r
+    # # hard code these
+    # # set these to be higher than SSS
     p = 5
     q = 7
+    gLambda = int(numpy.lcm(p-2, q-1))
+    g = randint(20, 100)
+    if (numpy.gcd(g, n * n) == 1):
+        print("g is relatively prime to n*n")
+    else:
+        print("WARNING: g is NOT relatively prime to n*n. Will not work!!!")
 
-    private_key = numpy.lcm(p-2, q-1)
     n = p * q
-    g = n + 1
-    print("n",n)
-    print("g",g)
-    return n, g
+    r = randint(20,150)
+    l = (pow(g, gLambda, n * n) - 1) // n
+    gMu = libnum.invmod(l, n)
+
+    print("Public key (n,g):\t\t", n, g)
+    print("Private key (lambda,mu):\t", gLambda, gMu)
+
+    l = (pow(g, gLambda, n * n) - 1) // n
+    gMu = libnum.invmod(l, n)
+    return n, g, r
 
 
 
@@ -38,26 +54,14 @@ def decrypt(value):
     """
     paillier homomorphic decryption technique to recover values sent by smart meter
     """
-    global private_key, n, g
+    global private_key, n, g,gMu
     start = time.perf_counter()
-    top = numpy.long(pow(value, int(private_key), n**2))
-    bottom = numpy.long(pow(g, int(private_key), n**2))
-    top = L(top)
-    bottom = L(bottom)
-    bottom = sympy.mod_inverse(int(bottom), int(n))
-    result = (top * bottom) % n
+    l = (pow(value, gLambda, n*n)-1) // n
+    mess = (l * gMu) % n
     end = time.perf_counter()
     print(end-start)
-    return result
+    return mess
 
-
-def L(val):
-    """
-    auxilliary function for decryption
-    """
-    global n
-    print("val", (val - 1) // n)
-    return (val - 1) // n
 
 
 def receive_input(connection, max_buffer_size = 5120):
@@ -86,7 +90,7 @@ def process_input(input_str):
 
 
 def main():
-    global consumption, num_sm, n, g
+    global consumption, num_sm, n, g, r
     # set up the server
     connections = []
     host = "127.0.0.1"  # will be VM ip
@@ -101,15 +105,17 @@ def main():
         sys.exit()
     soc.listen()  # queue up to 1 request
     print("Socket now listening")
+    generate_keys()
 
     while len(connections) < num_sm:
         connection, address = soc.accept()
         connections.append(connection)
         ip, port = str(address[0]), str(address[1])
         print("Connected with " + ip + ":" + port)
-        n, g = generate_keys()
-        send = str(n) + " " + str(g)
+
+        send = str(n) + " " + str(g) + " " + str(r)
         connection.sendall(send.encode("utf-8"))
+
 
     for connection in connections:
         #wait to receive input

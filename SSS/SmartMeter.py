@@ -5,7 +5,7 @@ import socket
 
 import tracemalloc
 
-NUM_TIME_INSTANCES = 20
+NUM_TIME_INSTANCES = 10
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0
@@ -166,24 +166,23 @@ def main():
         time.sleep(.1)
         print(end_create - start_create)  # uncomment this when checking time
         share_creation_time.append(end_create - start_create)
-    print("sum", total)
     bill_start = time.time()
     receive_bill()
     bill_end = time.time()
     print("Bill: ", sm.bill)
 
-    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/bill_time_sm" + str(
-        sm.get_ID()) + ".txt"
-    fs = open(filename, "w+")
-    fs.write(str((bill_end - bill_start) - (sub_end - sub_start)) + "\n")
-    fs.close()
-
-    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/share_creation_sm" + str(
-        sm.get_ID()) + ".txt"
-    fs = open(filename, "w+")
-    for val in share_creation_time:
-        fs.write(str(val) + "\n")
-    fs.close()
+    # filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/bill_time_sm" + str(
+    #     sm.get_ID()) + ".txt"
+    # fs = open(filename, "w+")
+    # fs.write(str((bill_end - bill_start) - (sub_end - sub_start)) + "\n")
+    # fs.close()
+    #
+    # filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/share_creation_sm" + str(
+    #     sm.get_ID()) + ".txt"
+    # fs = open(filename, "w+")
+    # for val in share_creation_time:
+    #     fs.write(str(val) + "\n")
+    # fs.close()
 
     print("Total:", total)
 

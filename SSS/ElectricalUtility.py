@@ -5,11 +5,11 @@ import tracemalloc
 from sympy import isprime
 
 NUM_AGGREGATORS = 3
-NUM_SMART_METERS = 1
+NUM_SMART_METERS = 2
 agg_connections = []
 sm_connections = []
 MAX_CONSUMPTION = 10
-NUM_TIME_INSTANCES = 1
+NUM_TIME_INSTANCES = 5
 ZP_SPACE = 0
 eu = None
 time_spatial = []
@@ -37,7 +37,7 @@ class ElectricalUtility:
                 self.price_dict.__setitem__(key, val)
         else:
             self.bill_price = int(bill_string)
-            print(self.price_dict)
+
 
     def set_spatial_value(self, value):
         self.spatial_value = value
@@ -66,10 +66,10 @@ def send_data():
         conn.sendall(send_string.encode("utf-8"))
 
 
-def send_data_sm():
+def send_data_sm(bill_method):
     global NUM_AGGREGATORS, NUM_TIME_INSTANCES, MAX_CONSUMPTION, ZP_SPACE, sm_connections, NUM_SMART_METERS
     degree = NUM_AGGREGATORS - 1
-    send_string = str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_AGGREGATORS)
+    send_string = str(bill_method)+ "\n" +str(degree) + "\n" + str(ZP_SPACE) + "\n" + str(NUM_AGGREGATORS)
     for conn in sm_connections:
         conn.sendall(send_string.encode("utf-8"))
 
@@ -127,15 +127,22 @@ def main(billing_method, bill_string):
     while len(sm_connections) < NUM_SMART_METERS:
         conn, addr = s_sm.accept()
         sm_connections.append(conn)
-    send_data_sm()
+    send_data_sm(billing_method)
 
     print("Spatial")
+    count = 0
     for i in range(0, NUM_TIME_INSTANCES * NUM_SMART_METERS):
+        if billing_method == 3 and ( count!= 0 and count % NUM_SMART_METERS == 0):
+            new_bill=input("Please enter a price for the new time instance")
+            for conn in agg_connections:
+                conn.sendall(str(new_bill).encode("utf-8"))
         for conn in agg_connections:
             start = time.time()
             get_spatial_results(conn)
             end = time.time()
             time_spatial.append(end - start)
+        count += 1
+
 
 
     print("Spatial Sum: ", eu.get_spatial_value())
@@ -175,6 +182,6 @@ if __name__ == '__main__':
               "Enter -1 for infinity")
         bill_string = input()
     else:
-        print("Please enter the number of time instances until a new price change: ")
-        bill_string = input()
+        print("Please enter the price for the first time instance:")
+        bill_string =input()
     main(billing_method, bill_string)

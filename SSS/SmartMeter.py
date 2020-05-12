@@ -4,8 +4,8 @@ import random as rand
 import socket
 
 import tracemalloc
-
-NUM_TIME_INSTANCES = 20
+BILL_METHOD = 0
+NUM_TIME_INSTANCES = 5
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0
@@ -105,16 +105,17 @@ def send_shares():
 
 
 def get_initialization_data(connections, max_buffer_size=5120):
-    global DEGREE, ZP_SPACE, start
+    global DEGREE, ZP_SPACE, start, BILL_METHOD
     input = eu_conn.recv(max_buffer_size)
     while not input:
         input = eu_conn.recv(max_buffer_size)
 
-    start = time.time()  # uncomment this when checking time
+    # start = time.time()  # uncomment this when checking time
     decoded_input = input.decode("utf-8")
     values = decoded_input.split("\n")
-    DEGREE = int(values[0])
-    ZP_SPACE = int(values[1])
+    BILL_METHOD = int(values[0])
+    DEGREE = int(values[1])
+    ZP_SPACE = int(values[2])
     print("Degree:", DEGREE)
     print("ZP:", ZP_SPACE)
 
@@ -145,7 +146,7 @@ def receive_bill():
 
 
 def main():
-    global sm, NUM_TIME_INSTANCES, connections, eu_conn, start, sub_start, sub_end
+    global sm, NUM_TIME_INSTANCES, connections, eu_conn, start, sub_start, sub_end, BILL_METHOD
     connect_to_eu()
     get_initialization_data(eu_conn)
     setup_connection()
@@ -155,6 +156,9 @@ def main():
     # run for number of time instances
 
     for i in range(0, NUM_TIME_INSTANCES):
+        if BILL_METHOD == 3 and i != 0:
+            for conn in connections:
+                conn.recv(5120)
         set_polynomial()
         secret = rand.randint(1, MAX_CONSUMPTION)
         total += secret

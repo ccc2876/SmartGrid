@@ -5,7 +5,7 @@ import socket
 
 import tracemalloc
 BILL_METHOD = 0
-NUM_TIME_INSTANCES = 5
+NUM_TIME_INSTANCES = 2
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
 DEGREE = 0

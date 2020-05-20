@@ -6,7 +6,7 @@ import traceback
 from threading import Thread, Lock
 from numpy import long
 
-NUM_TIME_INSTANCES = 2
+NUM_TIME_INSTANCES = 5
 NUM_SMART_METERS = 2
 NUM_AGGREGATORS = 3
 ZP_SPACE = 0
@@ -353,6 +353,7 @@ def dynamic_billing(bill_method, bill_string):
         start = time.time()  # uncomment this when checking for time
 
         for conn in sm_connections:
+            conn.send
             try:
                 t = Thread(target=communicate_sm_dynamic, args=(conn,bill_string))
                 t.start()

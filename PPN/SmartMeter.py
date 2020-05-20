@@ -5,13 +5,14 @@ import random as rand
 
 
 ppn_conns = []
-NUM_PPNS= 1
+NUM_PPNS= 2
 DEGREE = NUM_PPNS - 1
-NUM_TIME_INSTANCES = 2
+NUM_TIME_INSTANCES = 1
 MAX_COEFFICIENT = 4
 MAX_CONSUMPTION = 10
 ZP_SPACE = 0
 sm = None
+eu_conn = None
 
 
 
@@ -78,6 +79,19 @@ def connect_to_ppn():
         print("Connection Error")
         sys.exit()
 
+def connect_to_eu():
+    global eu_conn
+
+    eu_conn = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    host = "127.0.0.1"
+    port = 6000
+    try:
+        eu_conn.connect((host, port))
+    except:
+        print("Connection Error")
+        sys.exit()
+
+
 def send_shares():
     global ppn_conns, sm
     id = 1
@@ -88,11 +102,16 @@ def send_shares():
         id += 1
 
 
-def receive_bill():
-    time.sleep(5 )
+def receive_bill(max_buffer_size=5120):
+    bill = eu_conn.recv(max_buffer_size)
+    while not bill:
+        bill = eu_conn.recv(max_buffer_size)
+    bill = bill.decode("utf-8")
+    print("Bill: ", bill)
 
 def main():
     global sm
+    connect_to_eu()
     sm = SmartMeter(int(sys.argv[1]))
     connect_to_ppn()
     total = 0

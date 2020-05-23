@@ -5,8 +5,6 @@ import sympy
 import time
 from memory_profiler import profile
 
-#implement once per month
-#implement and every time instance
 
 num_sm = 20
 price_per_unit = 1

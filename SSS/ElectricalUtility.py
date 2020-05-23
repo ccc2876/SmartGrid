@@ -4,12 +4,12 @@ import sys
 import tracemalloc
 from sympy import isprime
 
-NUM_AGGREGATORS = 3
-NUM_SMART_METERS = 2
+NUM_AGGREGATORS = 1
+NUM_SMART_METERS = 1
 agg_connections = []
 sm_connections = []
 MAX_CONSUMPTION = 10
-NUM_TIME_INSTANCES = 2
+NUM_TIME_INSTANCES = 10
 ZP_SPACE = 0
 eu = None
 time_spatial = []
@@ -47,11 +47,12 @@ class ElectricalUtility:
 
 
 def send_data():
+    # make
     global NUM_AGGREGATORS, NUM_TIME_INSTANCES, MAX_CONSUMPTION, ZP_SPACE, agg_connections, NUM_SMART_METERS, eu
     val = NUM_TIME_INSTANCES * MAX_CONSUMPTION
     while not isprime(val):
         val += 1
-    ZP_SPACE = val
+    ZP_SPACE = val # save as bytes
     degree = NUM_AGGREGATORS - 1
     if eu.billing_method == 1:
         send_string = str(billing_method) + "\n" + str(eu.bill_price) + "\n" + str(degree) + "\n" + str(

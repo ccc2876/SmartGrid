@@ -4,13 +4,13 @@ import sys
 import tracemalloc
 from sympy import isprime
 
-NUM_SMART_METERS = 2
-NUM_PPN = 2
+NUM_SMART_METERS = 20
+NUM_PPN = 10
 config_conn = None
 ppn_connections = []
 sm_conns = []
 MAX_CONSUMPTION = 10
-NUM_TIME_INSTANCES = 2
+NUM_TIME_INSTANCES = 10
 ZP_SPACE = 0
 eu = None
 time_spatial = []

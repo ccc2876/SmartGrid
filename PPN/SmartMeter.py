@@ -5,9 +5,9 @@ import random as rand
 
 
 ppn_conns = []
-NUM_PPNS= 2
+NUM_PPNS= 10
 DEGREE = NUM_PPNS - 1
-NUM_TIME_INSTANCES = 1
+NUM_TIME_INSTANCES = 10
 MAX_COEFFICIENT = 4
 MAX_CONSUMPTION = 10
 ZP_SPACE = 0
@@ -102,6 +102,7 @@ def send_shares():
         id += 1
 
 
+
 def receive_bill(max_buffer_size=5120):
     bill = eu_conn.recv(max_buffer_size)
     while not bill:
@@ -110,7 +111,7 @@ def receive_bill(max_buffer_size=5120):
     print("Bill: ", bill)
 
 def main():
-    global sm
+    global sm,NUM_TIME_INSTANCES
     connect_to_eu()
     sm = SmartMeter(int(sys.argv[1]))
     connect_to_ppn()
@@ -121,8 +122,13 @@ def main():
         total += secret
         print("Secret: ", secret)
         sm.set_secret(secret)
+        start_create = time.time()  # uncomment this when checking time
         send_shares()
-        time.sleep(.1)
+        end_create = time.time()  # uncomment this when checking time
+        time.sleep(.5)
+        print(end_create - start_create)  # uncomment this when checking time
+
+
 
     receive_bill()
 

@@ -9,13 +9,31 @@ price_per_unit = -1
 all_readings=[]
 
 
-def get_readings():
+def get_readings(billing_method, bill_string):
     global price_per_unit
     # will be read from csv file REMEMBER TO SUM THE ROWS EVENTUALY
     read = random.randint(1, 10)
-    cost = read * price_per_unit
-    print("Read", read)
-    print("Cost", cost)
+    if billing_method == 1:
+        bill_amount = int(bill_string)
+        cost = read * bill_amount
+    elif billing_method == 2:
+        b_dict= eval(bill_string)
+        print(b_dict)
+        cost = 0
+        val = read
+        sub = 0
+        prev_key =0
+        for key in b_dict.keys():
+            if sub < val:
+                if (val > key and key !=-1):
+                    cost +=(key-prev_key) * b_dict.get(key)
+                    sub += key - prev_key
+                    prev_key = key
+                else:
+                    cost +=(val - prev_key) * b_dict.get(key)
+                    sub +=(val - prev_key)
+    else:
+        cost = read * price_per_unit
     return cost
 
 
@@ -24,7 +42,7 @@ def encrypt(read):
     r = random.randint(1, 1)
 
     encrypted_val = ((g ** read) * (r ** n)) % (n ** 2)
-    print("e", encrypted_val)
+    # print("e", encrypted_val)
     return encrypted_val
 
 
@@ -40,8 +58,8 @@ def receive_input(connection, max_buffer_size=5120):
     if client_input_size > max_buffer_size:
         print("The input size is greater than expected {}".format(client_input_size))
     decoded_input = client_input.decode("utf8").rstrip()
-    result = process_input(decoded_input)
-    return result
+
+    return   decoded_input
 
 
 def process_input(input_str):
@@ -65,20 +83,22 @@ def main():
     except:
         print("Connection Error")
         sys.exit()
-
+    start = time.time()
     inp = receive_input(soc)
-    inp = inp.split(" ")
-    price_per_unit = int(inp[0])
-    n = int(inp[1])
-    g = int(inp[2])
+    inp = inp.split("\n")
+    n = int(inp[0])
+    g = int(inp[1])
+    billing_method = int(inp[2])
+    bill_string = inp[3]
     for i in range(0,10):
-        value = encrypt(get_readings())
-        print(value)
+        value = encrypt(get_readings(billing_method, bill_string))
+        # print(value)
         soc.sendall(str(value).encode("utf-8"))
-        time.sleep(.01)
+        time.sleep(.0001)
 
 
-
+    end = time.time()
+    print(end-start)
 
 if __name__ == "__main__":
     main()

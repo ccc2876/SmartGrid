@@ -5,8 +5,8 @@ import socket
 
 import tracemalloc
 BILL_METHOD = 0
-NUM_TIME_INSTANCES = 2
-NUM_AGGREGATORS = 3
+NUM_TIME_INSTANCES = 10
+NUM_AGGREGATORS = 1
 ZP_SPACE = 0
 DEGREE = 0
 MAX_COEFFICIENT = 4
@@ -167,7 +167,7 @@ def main():
         start_create = time.time()  # uncomment this when checking time
         send_shares()
         end_create = time.time()  # uncomment this when checking time
-        time.sleep(.1)
+        time.sleep(0.015)
         print(end_create - start_create)  # uncomment this when checking time
         share_creation_time.append(end_create - start_create)
     print("sum", total)

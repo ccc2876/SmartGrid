@@ -11,7 +11,7 @@ from memory_profiler import profile
 private_key = -1
 n = -1
 g = -1
-num_sm = 2
+num_sm = 10
 consumption = 0
 
 
@@ -22,8 +22,8 @@ def generate_keys():
     global private_key, n, g
     # hard code these
     # set these to be higher than SSS
-    p = 5
-    q = 7
+    p = 13
+    q = 17
 
     private_key = numpy.lcm(p-2, q-1)
     n = p * q
@@ -107,6 +107,8 @@ def main():
         connections.append(connection)
         ip, port = str(address[0]), str(address[1])
         print("Connected with " + ip + ":" + port)
+        # REGISTRATION
+        
         n, g = generate_keys()
         send = str(n) + " " + str(g)
         connection.sendall(send.encode("utf-8"))

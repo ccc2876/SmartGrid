@@ -2,7 +2,7 @@ import socket
 import sys
 
 eu_conn = None
-NUM_PPN = 2
+NUM_PPN = 10
 ppn_conns = []
 config = None
 

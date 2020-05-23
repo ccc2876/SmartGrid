@@ -11,9 +11,9 @@ from threading import Thread, Lock
 g = -1
 n = -1
 total_count = 0
-num_sm = 2
+num_sm = 10
 total_readings = 1
-time_instances = 1
+time_instances = 10
 server_done = False
 SM_CONN_SERVER = []
 SM_CONN_CLIENT = []
@@ -34,7 +34,7 @@ def encrypt(read):
     r = random.randint(1, 10)
     encrypted_val = ((g ** read) * (r ** n)) % (n ** 2)
     end = time.time()
-    print(end - start)
+    # print(end - start)
     print("e", encrypted_val)
 
     return encrypted_val
@@ -52,7 +52,7 @@ def receive_input(connection, max_buffer_size=5120):
     if client_input_size > max_buffer_size:
         print("The input size is greater than expected {}".format(client_input_size))
     decoded_input = client_input.decode("utf8").rstrip()
-    print("Dec", decoded_input)
+    # print("Dec", decoded_input)
     return decoded_input
 
 
@@ -68,7 +68,7 @@ def get_key(soc):
 
 
 def send_final(soc):
-    print(total_readings)
+    # print(total_readings)
     lock.acquire()
     soc.sendall(str(total_readings).encode("utf-8"))
     lock.release()
@@ -126,11 +126,11 @@ def recv_from_sm(max_buffer_size=5120):
     global SM_CONN_CLIENT,total_readings
     for conn in SM_CONN_CLIENT:
         input = conn.recv(max_buffer_size)
-        while not input:
-            input = conn.recv(max_buffer_size)
+        # while not input:
+        #     input = conn.recv(max_buffer_size)
         decoded_input = input.decode("utf-8")
         total_readings*= int(decoded_input)
-        print(total_readings)
+        # print(total_readings)
 
 
 def main():
@@ -153,13 +153,22 @@ def main():
     connect_to_eu()
     public_key = get_key(eu_conn)
 
-    for i in range(0,time_instances):
+    total = []
+    total_i=0
+    for i in range(0,time_instances-1):
         val = get_readings()
         encrypted = encrypt(val)
         total_readings*= encrypted
-        print(total_readings)
+        # print(total_readings)
+        s= time.time()
         send_to_sm()
         recv_from_sm()
+        time.sleep(0.015)
+        e= time.time()
+        total_i+= e- s
+        total.append(total_i)
+    print("time:", sum(total) / len(total) )
+
 
 
     send_final(eu_conn)

@@ -7,8 +7,8 @@ from threading import Thread, Lock
 from numpy import long
 
 NUM_TIME_INSTANCES = 10
-NUM_SMART_METERS = 1
-NUM_AGGREGATORS = 1
+NUM_SMART_METERS = 80
+NUM_AGGREGATORS = 10
 ZP_SPACE = 0
 DEGREE = 0
 aggregator = None
@@ -162,11 +162,11 @@ def recv_aggregators_spatial(max_buffer_size=5120):
             input = conn.recv(max_buffer_size)
         decoded_input = input.decode("utf-8")
         aggregator.set_total_consumption(int(float(decoded_input)))
+    # time.sleep(0.001)
 
 
 def communicate_smart_meter(conn):
     global sm_connections, NUM_TIME_INSTANCES, aggregator, eu_conn, recv_shares_count, s,e
-    s = time.time()
     lock.acquire()
     string = ""
     string += receive_shares(conn)
@@ -178,7 +178,9 @@ def communicate_smart_meter(conn):
     constant = long(aggregator.get_spatial_counter()) * long(aggregator.get_lagrange_multiplier())
     aggregator.calc_sum(constant)
     recv_shares_count += 1
+    # time.sleep(0.001)
     lock.release()
+    # print(e-s)
 
 
 
@@ -188,7 +190,6 @@ def communicate_sm_dynamic(conn,bill_string):
     string = ""
     string += receive_shares(conn)
     shares_time_instances = string.split(" ")
-    print(shares_time_instances)
     meter_id = int(shares_time_instances[0])
     aggregator.update_billing_dict(meter_id, shares_time_instances[1])
     aggregator.update_spatial_counter(shares_time_instances[1])
@@ -229,7 +230,6 @@ def connect_to_aggs_as_client(port):
             soc.connect((host, port))
         except:
             print("Connection Error")
-            sys.exit()
 
 
 def send_aggregators_temporal(i):
@@ -237,7 +237,7 @@ def send_aggregators_temporal(i):
     for conn in AGG_CONNS_SERVER:
         value = aggregator.bill_share_value[i]
         conn.sendall(str(value).encode("utf-8"))
-    time.sleep(.0001)
+        time.sleep(.001)
 
 
 def recv_aggregators_temporal(i, max_buffer_size=5120):
@@ -250,7 +250,6 @@ def recv_aggregators_temporal(i, max_buffer_size=5120):
         lock.acquire()
         aggregator.set_consumption(i, int(float(decoded_input)))
         lock.release()
-    time.sleep(.0001)
 
 
 def connect_to_eu():
@@ -259,16 +258,15 @@ def connect_to_eu():
 
     host = "127.0.0.1"
     port = 8000
-    # try:
-    eu_conn.connect((host, port))
-    # except:
-    #     print("Connection Error")
-    #     sys.exit()
+    try:
+        eu_conn.connect((host, port))
+    except:
+        print("Connection Error")
+        sys.exit()
 
 def get_new_price(max_buffer_size=5120):
     global eu_conn
     input = eu_conn.recv(max_buffer_size)
-    print(input)
     return input
 
 
@@ -286,8 +284,7 @@ def receive_data_eu(max_buffer_size=5120):
     ZP_SPACE = int(values[3])
     NUM_SMART_METERS = int(values[4])
     end = time.time()
-    print(end - start)
-    print(DEGREE, ZP_SPACE, NUM_SMART_METERS)
+    # print(end - start)
     return bill_method,billing_string
 
 
@@ -306,7 +303,6 @@ def create_bill_data(billing_method, billing_string):
             aggregator.consumption_dict[i] = aggregator.consumption_dict[i] * bill_amount
     elif billing_method == 2:
         b_dict= eval(billing_string)
-        print(b_dict)
         for i in range(1, len(aggregator.consumption_dict) + 1):
             cost = 0
             val = aggregator.consumption_dict[i]
@@ -325,7 +321,7 @@ def create_bill_data(billing_method, billing_string):
 
     else:
         for i in range(1, len(aggregator.consumption_dict) + 1):
-            print(aggregator.consumption_dict)
+            aggregator.consumption_dict[i] = aggregator.dynamic_bill_dict[i]
 
 
 
@@ -366,6 +362,7 @@ def dynamic_billing(bill_method, bill_string):
             send_aggregators_spatial()
             recv_aggregators_spatial()
             send_spatial_eu()
+            # time.sleep(0.001)
             aggregator.reset_spatial()
             lock.release()
 
@@ -375,24 +372,19 @@ def dynamic_billing(bill_method, bill_string):
     send_bill = True
     time.sleep(.5)
     # temporal aggregation
+    start = time.time()
     if send_bill:
         for i in range(1, NUM_SMART_METERS + 1):
-            print("Starting memory trace...")
             aggregator.get_billing_amount(i,bill_method)
-            start = time.time()  # uncomment this when checking for time
+
             send_aggregators_temporal(i)
             recv_aggregators_temporal(i)
-            end = time.time()  # uncomment this when checking for time
-            time.sleep(.25)
-            print("Temporal:", end - start - 1)  # uncomment this when checking for time
-            time_temporal.append((end - start - 1))
-    print(aggregator.consumption_dict)
-    start = time.time()
+            # time.sleep(0.001)
     create_bill_data(bill_method, bill_string)
+    send_bill_data_eu()
     end = time.time()
     print(end - start)
-    print(aggregator.consumption_dict)
-    send_bill_data_eu()
+
 
     for i in range(0, NUM_SMART_METERS):
         send_bill_data_sm(i)
@@ -400,6 +392,7 @@ def dynamic_billing(bill_method, bill_string):
 def linear_cumulative_bill(bill_method, bill_string):
     global aggregator, NUM_AGGREGATORS, DEGREE, ZP_SPACE, time_spatial, time_temporal,e,s
     send_bill = False
+    s = time.time()
     for i in range(0, NUM_TIME_INSTANCES):
         for conn in sm_connections:
             try:
@@ -415,49 +408,40 @@ def linear_cumulative_bill(bill_method, bill_string):
             send_spatial_eu()
             aggregator.reset_spatial()
             lock.release()
-
-
+            time.sleep(0.0001)
+    e= time.time()
+    # print(e-s)
+    time.sleep(10)
+    print(recv_shares_count)
     while recv_shares_count < (NUM_TIME_INSTANCES * NUM_SMART_METERS):
         send_bill = False
     send_bill = True
-    time.sleep(.5)
+
     # temporal aggregation
+    start = time.time()
     if send_bill:
-        start = time.time()
         for i in range(1, NUM_SMART_METERS + 1):
             aggregator.get_billing_amount(i, bill_method)
             send_aggregators_temporal(i)
             recv_aggregators_temporal(i)
-        end = time.time()
-        print(end-start)
+            time.sleep(0.015)
 
-    print(aggregator.consumption_dict)
+
     create_bill_data(bill_method, bill_string)
-    print(aggregator.consumption_dict)
-    send_bill_data_eu()
 
+    end = time.time()
+    print(end - start)
     for i in range(0, NUM_SMART_METERS):
         send_bill_data_sm(i)
 
-    # # write time to files
-    # filename_spatial = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/AggregatorFiles/time_spatial_agg" + str(
-    #     ID) + ".txt"
-    # fs = open(filename_spatial, "w+")
-    # for val in time_spatial:
-    #     fs.write(str(val) + "\n")
-    #
-    # filename_temporal = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/AggregatorFiles/time_temporal_agg" + str(
-    #     ID) + ".txt"
-    # ft = open(filename_temporal, "w+")
-    # for val in time_temporal:
-    #     ft.write(str(val) + "\n")
+    send_bill_data_eu()
 
 
 def setup():
     global aggregator, NUM_AGGREGATORS, DEGREE, ZP_SPACE, time_spatial, time_temporal
     counter = 1
     ID = int(sys.argv[1])
-    print(ID)
+    # print(ID)
     port = 8000 + ID
 
     aggregator = Aggregator(ID)

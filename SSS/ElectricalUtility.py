@@ -1,11 +1,13 @@
 import socket
 import time
+import random as rand
 import sys
 import tracemalloc
 from sympy import isprime
 
-NUM_AGGREGATORS = 1
-NUM_SMART_METERS = 1
+
+NUM_AGGREGATORS = 10
+NUM_SMART_METERS = 80
 agg_connections = []
 sm_connections = []
 MAX_CONSUMPTION = 10
@@ -132,19 +134,20 @@ def main(billing_method, bill_string):
 
     print("Spatial")
     count = 0
+    start = time.time()
     for i in range(0, NUM_TIME_INSTANCES * NUM_SMART_METERS):
         if billing_method == 3 and ( count!= 0 and count % NUM_SMART_METERS == 0):
-            new_bill=input("Please enter a price for the new time instance")
+            new_bill=rand.randint(1,4)
             for conn in agg_connections:
                 conn.sendall(str(new_bill).encode("utf-8"))
+
         for conn in agg_connections:
-            start = time.time()
+
             get_spatial_results(conn)
-            end = time.time()
-            time_spatial.append(end - start)
         count += 1
 
-
+    end = time.time()
+    print(end - start)
 
     print("Spatial Sum: ", eu.get_spatial_value())
     print("Temporal")

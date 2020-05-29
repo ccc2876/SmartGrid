@@ -5,8 +5,8 @@ import socket
 
 import tracemalloc
 BILL_METHOD = 0
-NUM_TIME_INSTANCES = 10
-NUM_AGGREGATORS = 1
+NUM_TIME_INSTANCES = 80
+NUM_AGGREGATORS = 10
 ZP_SPACE = 0
 DEGREE = 0
 MAX_COEFFICIENT = 4
@@ -50,7 +50,7 @@ class SmartMeter:
             share += num * (ID ** deg_copy)
             deg_copy -= 1
         share += self.secret
-        print("Share for AGG #" + str(ID), ": ", share)
+        # print("Share for AGG #" + str(ID), ": ", share)
         return share
 
 
@@ -102,22 +102,25 @@ def send_shares():
         send_string = str(sm.get_ID()) + " " + str(share)
         conn.sendall(send_string.encode("utf-8"))
         id += 1
+    time.sleep(.1)
 
 
 def get_initialization_data(connections, max_buffer_size=5120):
     global DEGREE, ZP_SPACE, start, BILL_METHOD
     input = eu_conn.recv(max_buffer_size)
+    start = time.time()  # uncomment this when checking time
     while not input:
         input = eu_conn.recv(max_buffer_size)
 
-    # start = time.time()  # uncomment this when checking time
+
     decoded_input = input.decode("utf-8")
     values = decoded_input.split("\n")
     BILL_METHOD = int(values[0])
     DEGREE = int(values[1])
     ZP_SPACE = int(values[2])
-    print("Degree:", DEGREE)
-    print("ZP:", ZP_SPACE)
+    end= time.time()
+    # print("Degree:", DEGREE)
+    # print("ZP:", ZP_SPACE)
 
 
 def connect_to_eu():
@@ -162,32 +165,19 @@ def main():
         set_polynomial()
         secret = rand.randint(1, MAX_CONSUMPTION)
         total += secret
-        print("Secret: ", secret)
+        # print("Secret: ", secret)
         sm.set_secret(secret)
-        start_create = time.time()  # uncomment this when checking time
+        # start_create = time.time()  # uncomment this when checking time
         send_shares()
-        end_create = time.time()  # uncomment this when checking time
-        time.sleep(0.015)
-        print(end_create - start_create)  # uncomment this when checking time
-        share_creation_time.append(end_create - start_create)
+        # end_create = time.time()  # uncomment this when checking time
+        time.sleep(.015)
+        # print(end_create - start_create)  # uncomment this when checking time
+
     print("sum", total)
     bill_start = time.time()
     receive_bill()
     bill_end = time.time()
     print("Bill: ", sm.bill)
-
-    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/bill_time_sm" + str(
-        sm.get_ID()) + ".txt"
-    fs = open(filename, "w+")
-    fs.write(str((bill_end - bill_start) - (sub_end - sub_start)) + "\n")
-    fs.close()
-
-    filename = "/Users/clairecasalnova/PycharmProjects/SmartGrid/SSS/SmartMeterFiles/share_creation_sm" + str(
-        sm.get_ID()) + ".txt"
-    fs = open(filename, "w+")
-    for val in share_creation_time:
-        fs.write(str(val) + "\n")
-    fs.close()
 
     print("Total:", total)
 
